@@ -6,7 +6,6 @@ $shop_url      = home_url('/shop/');
 ?>
 
 <section class="zc-about-hero">
-  bryan
   <div class="zc-about-hero__container">
 
     <nav class="zc-about-hero__breadcrumb" aria-label="Breadcrumb">
