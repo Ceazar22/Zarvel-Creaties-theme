@@ -49,17 +49,20 @@ foreach ($products as $product) {
       $attributes = [];
       $color_value = '';
 
-      foreach ($variation->get_attributes() as $attribute_name => $attribute_value) {
-        $clean_name = wc_attribute_label(str_replace('attribute_', '', $attribute_name));
+      foreach ($variation->get_variation_attributes() as $attribute_name => $attribute_value) {
+        $taxonomy_name = str_replace('attribute_', '', $attribute_name);
+        $clean_name = wc_attribute_label($taxonomy_name);
         $clean_value = $attribute_value;
 
-        if (taxonomy_exists(str_replace('attribute_', '', $attribute_name))) {
-          $term = get_term_by('slug', $attribute_value, str_replace('attribute_', '', $attribute_name));
+        if (taxonomy_exists($taxonomy_name)) {
+          $term = get_term_by('slug', $attribute_value, $taxonomy_name);
           if ($term && !is_wp_error($term)) {
             $clean_value = $term->name;
           }
         }
 
+        $attributes[$attribute_name] = $attribute_value;
+        $attributes[$taxonomy_name] = $attribute_value;
         $attributes[$clean_name] = $clean_value;
 
         if (
@@ -676,11 +679,21 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
       const inner = root.querySelector('.zc-product-customizer__inner');
       const catalogScript = root.querySelector('[data-zc-product-catalog]');
-      const catalog = JSON.parse(catalogScript.textContent || '[]');
+      let catalog = [];
+
+      try {
+        catalog = JSON.parse(catalogScript ? catalogScript.textContent || '[]' : '[]');
+      } catch (error) {
+        catalog = [];
+      }
 
       const ajaxUrl = inner.dataset.ajaxUrl;
       const nonce = inner.dataset.nonce;
       const currencySymbol = inner.dataset.currencySymbol || '$';
+      const zcRequestParams = new URLSearchParams(window.location.search);
+      const zcInitialProductId = zcRequestParams.get('zc_product_id') || '';
+      const zcInitialVariationId = zcRequestParams.get('zc_variation_id') || '';
+      const zcInitialQuantity = zcRequestParams.get('quantity') || '1';
 
       const productSelect = root.querySelector('[data-product-select]');
       const variantWrap = root.querySelector('[data-variant-wrap]');
@@ -846,6 +859,76 @@ $currency_symbol = get_woocommerce_currency_symbol();
         updateAddButton();
       }
 
+      function getVariationAttributeMatch() {
+        if (!selectedProduct || !Array.isArray(selectedProduct.variants)) {
+          return null;
+        }
+
+        const requestedAttributes = {};
+
+        zcRequestParams.forEach((value, key) => {
+          if (key.indexOf('attribute_') === 0 && value) {
+            requestedAttributes[key.replace(/^attribute_/, '')] = value;
+          }
+        });
+
+        const requestedKeys = Object.keys(requestedAttributes);
+
+        if (!requestedKeys.length) {
+          return null;
+        }
+
+        return selectedProduct.variants.find(variant => {
+          const attributes = variant.attributes || {};
+
+          return requestedKeys.every(key => {
+            const requestedValue = String(requestedAttributes[key]).toLowerCase();
+
+            return Object.keys(attributes).some(attributeKey => {
+              const normalizedKey = String(attributeKey).toLowerCase().replace(/^attribute_/, '');
+              const normalizedValue = String(attributes[attributeKey]).toLowerCase();
+
+              return normalizedKey === key.toLowerCase() && normalizedValue === requestedValue;
+            });
+          });
+        }) || null;
+      }
+
+      function preloadProductFromUrl() {
+        if (!zcInitialProductId || !productSelect) return;
+
+        selectedProduct = getProductById(zcInitialProductId);
+
+        if (!selectedProduct) {
+          showNotice('Product was passed to the design studio, but it was not found in the customizer catalog.', 'error');
+          return;
+        }
+
+        productSelect.value = zcInitialProductId;
+        renderVariants();
+
+        if (zcInitialVariationId && variantSelect) {
+          variantSelect.value = zcInitialVariationId;
+          selectVariant(zcInitialVariationId);
+        }
+
+        if (!selectedVariant) {
+          const matchedVariant = getVariationAttributeMatch();
+
+          if (matchedVariant && variantSelect) {
+            variantSelect.value = matchedVariant.id;
+            selectVariant(matchedVariant.id);
+          }
+        }
+
+        if (zcInitialVariationId && !selectedVariant) {
+          showNotice('Product loaded, but the selected variation was not found. Please choose a variant.', 'error');
+          return;
+        }
+
+        showNotice('Product loaded. Finish your design, then add it to cart.', 'success');
+      }
+
       productSelect.addEventListener('change', () => {
         clearNotice();
         selectedProduct = getProductById(productSelect.value);
@@ -917,14 +1000,16 @@ $currency_symbol = get_woocommerce_currency_symbol();
       });
 
       root.querySelector('[data-add-text]').addEventListener('click', () => {
-        const value = textInput.value.trim();
+        clearNotice();
+
+        const value = String(textInput.value || '').trim();
 
         if (!value) {
           showNotice('Add some text first.', 'error');
           return;
         }
 
-        state.objects.push({
+        const textObject = {
           id: Date.now(),
           type: 'text',
           text: value,
@@ -932,11 +1017,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
           y: 300,
           color: textColor.value,
           outline: textOutline.value,
-          fontSize: Number(fontSize.value || 42),
+          fontSize: Number(fontSize.value) || 42,
           bold: state.bold,
           italic: state.italic,
           underline: state.underline,
-        });
+        };
+
+        state.objects.push(textObject);
+        selectedObject = textObject;
 
         textInput.value = '';
         draw();
@@ -1119,35 +1207,66 @@ $currency_symbol = get_woocommerce_currency_symbol();
         ctx.restore();
       }
 
-      function drawObject(object) {
-        ctx.save();
+      function getTextLines(object) {
+        const lines = String(object.text || '')
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          .split('\n')
+          .map(line => line.trim())
+          .filter(Boolean);
 
-        if (object.type === 'text' || object.type === 'clipart') {
-          const fontStyle = object.italic ? 'italic ' : '';
-          const fontWeight = object.bold ? '800 ' : '400 ';
-          ctx.font = `${fontStyle}${fontWeight}${object.fontSize}px Arial, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+        return lines.length ? lines : ['Text'];
+      }
+
+      function getCanvasFont(object) {
+        const fontStyle = object.italic ? 'italic' : 'normal';
+        const fontWeight = object.bold ? '800' : '400';
+        const fontSizeValue = Number(object.fontSize) || 42;
+
+        return `${fontStyle} ${fontWeight} ${fontSizeValue}px Arial, Helvetica, sans-serif`;
+      }
+
+      function drawTextLikeObject(object) {
+        const lines = getTextLines(object);
+        const fontSizeValue = Number(object.fontSize) || 42;
+        const lineHeight = fontSizeValue * 1.18;
+        const startY = object.y - ((lines.length - 1) * lineHeight) / 2;
+
+        ctx.font = getCanvasFont(object);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+
+        lines.forEach((line, index) => {
+          const lineY = startY + index * lineHeight;
 
           if (object.outline) {
             ctx.strokeStyle = object.outline;
             ctx.lineWidth = 4;
-            ctx.strokeText(object.text, object.x, object.y);
+            ctx.strokeText(line, object.x, lineY);
           }
 
-          ctx.fillStyle = object.color || '#111';
-          ctx.fillText(object.text, object.x, object.y);
+          ctx.fillStyle = object.color || '#111111';
+          ctx.fillText(line, object.x, lineY);
 
           if (object.underline) {
-            const metrics = ctx.measureText(object.text);
+            const metrics = ctx.measureText(line);
             const width = metrics.width;
             ctx.beginPath();
-            ctx.moveTo(object.x - width / 2, object.y + object.fontSize / 2);
-            ctx.lineTo(object.x + width / 2, object.y + object.fontSize / 2);
-            ctx.strokeStyle = object.color || '#111';
+            ctx.moveTo(object.x - width / 2, lineY + fontSizeValue / 2);
+            ctx.lineTo(object.x + width / 2, lineY + fontSizeValue / 2);
+            ctx.strokeStyle = object.color || '#111111';
             ctx.lineWidth = 2;
             ctx.stroke();
           }
+        });
+      }
+
+      function drawObject(object) {
+        ctx.save();
+
+        if (object.type === 'text' || object.type === 'clipart') {
+          drawTextLikeObject(object);
         }
 
         if (object.type === 'image' && object.image) {
@@ -1210,18 +1329,23 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
       function getObjectBounds(object) {
         if (object.type === 'text' || object.type === 'clipart') {
+          const lines = getTextLines(object);
+          const fontSizeValue = Number(object.fontSize) || 42;
+          const lineHeight = fontSizeValue * 1.18;
+          let width = 30;
+
           ctx.save();
-          const fontStyle = object.italic ? 'italic ' : '';
-          const fontWeight = object.bold ? '800 ' : '400 ';
-          ctx.font = `${fontStyle}${fontWeight}${object.fontSize}px Arial, sans-serif`;
-          const width = Math.max(ctx.measureText(object.text).width, 30);
+          ctx.font = getCanvasFont(object);
+          lines.forEach(line => {
+            width = Math.max(width, ctx.measureText(line).width);
+          });
           ctx.restore();
 
           return {
             x: object.x - width / 2,
-            y: object.y - object.fontSize / 2,
+            y: object.y - (lines.length * lineHeight) / 2,
             width,
-            height: object.fontSize,
+            height: lines.length * lineHeight,
           };
         }
 
@@ -1366,8 +1490,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
         formData.append('action', 'zc_customizer_add_to_cart');
         formData.append('nonce', nonce);
         formData.append('product_id', selectedProduct.id);
-        formData.append('variation_id', selectedVariant.id);
-        formData.append('quantity', '1');
+        formData.append('variation_id', selectedProduct.type === 'variable' ? selectedVariant.id : '');
+        formData.append('quantity', zcInitialQuantity || '1');
         formData.append('design_title', designTitle.value || 'Untitled Design');
         formData.append('imprint', imprint.value || '');
         formData.append('imprint_size', imprintSize.value || '');
@@ -1408,6 +1532,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
       draw();
       updatePrice();
       updateAddButton();
+      preloadProductFromUrl();
     })();
   </script>
 </section>

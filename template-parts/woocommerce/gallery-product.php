@@ -296,6 +296,8 @@ $review_count   = $product->get_review_count();
 $button_text_filter = function () {
   return 'SEND DESIGN REQUEST';
 };
+
+$zc_customizer_url = home_url('/page-design-studio/');
 ?>
 
 <section class="zc-product-section">
@@ -465,6 +467,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const variationGalleryMap = <?php echo wp_json_encode($zc_color_gallery_map); ?>;
   const defaultGallery = <?php echo wp_json_encode($initial_gallery_images); ?>;
+  const zcCustomizerUrl = <?php echo wp_json_encode($zc_customizer_url); ?>;
+  const zcCurrentProductId = <?php echo wp_json_encode($product->get_id()); ?>;
 
   function normalizeColorName(colorName) {
     return String(colorName || '')
@@ -688,6 +692,135 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   initZcQuantityAndButtons();
+  initZcSendDesignRequestToCustomizer();
+
+  function initZcSendDesignRequestToCustomizer() {
+    const formArea = document.querySelector('[data-zc-product-form-area]');
+
+    if (!formArea) return;
+
+    function keepDesignRequestButtonsClickable() {
+      formArea.querySelectorAll('.single_add_to_cart_button').forEach(function (button) {
+        button.disabled = false;
+        button.removeAttribute('disabled');
+        button.setAttribute('aria-disabled', 'false');
+      });
+    }
+
+    function getProductIdFromForm(form) {
+      const productIdInput = form.querySelector('input[name="product_id"]');
+      const addToCartInput = form.querySelector('input[name="add-to-cart"], button[name="add-to-cart"]');
+
+      return (productIdInput && productIdInput.value) ||
+        (addToCartInput && addToCartInput.value) ||
+        zcCurrentProductId ||
+        '';
+    }
+
+    function getVariationIdFromForm(form) {
+      const variationIdInput = form.querySelector('input[name="variation_id"]');
+      return variationIdInput && variationIdInput.value ? variationIdInput.value : '';
+    }
+
+    function getQuantityFromForm(form) {
+      const quantityInput = form.querySelector('input.qty[name="quantity"], input.qty');
+      return quantityInput && quantityInput.value ? quantityInput.value : '1';
+    }
+
+    function getMissingVariationLabels(form) {
+      const missing = [];
+
+      form.querySelectorAll('.variations select').forEach(function (select) {
+        if (select.value) return;
+
+        const row = select.closest('tr');
+        const label = row ? row.querySelector('label') : null;
+        const labelText = label ? label.textContent.trim() : 'option';
+
+        missing.push(labelText.replace(':', ''));
+      });
+
+      return missing;
+    }
+
+    function buildCustomizerUrl(form) {
+      const productId = getProductIdFromForm(form);
+      const variationId = getVariationIdFromForm(form);
+      const quantity = getQuantityFromForm(form);
+      const url = new URL(zcCustomizerUrl, window.location.origin);
+
+      url.searchParams.set('zc_product_id', productId);
+      url.searchParams.set('quantity', quantity);
+
+      if (variationId && variationId !== '0') {
+        url.searchParams.set('zc_variation_id', variationId);
+      }
+
+      form.querySelectorAll('.variations select').forEach(function (select) {
+        if (!select.name || !select.value) return;
+        url.searchParams.set(select.name, select.value);
+      });
+
+      return url.toString();
+    }
+
+    function redirectToCustomizer(form) {
+      if (!form) return;
+
+      const isVariableForm = form.classList.contains('variations_form');
+      const missingVariationLabels = getMissingVariationLabels(form);
+      const variationId = getVariationIdFromForm(form);
+
+      if (isVariableForm && (missingVariationLabels.length || !variationId || variationId === '0')) {
+        if (window.jQuery) {
+          jQuery(form).trigger('check_variations');
+        }
+
+        alert('Please select ' + (missingVariationLabels.join(', ') || 'all product options') + ' first.');
+        return;
+      }
+
+      window.location.href = buildCustomizerUrl(form);
+    }
+
+    keepDesignRequestButtonsClickable();
+
+    formArea.addEventListener('click', function (event) {
+      const button = event.target.closest('.single_add_to_cart_button');
+
+      if (!button) return;
+
+      const form = button.closest('form.cart');
+
+      if (!form) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      redirectToCustomizer(form);
+    }, true);
+
+    formArea.addEventListener('submit', function (event) {
+      const form = event.target.closest('form.cart');
+
+      if (!form) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      redirectToCustomizer(form);
+    }, true);
+
+    if (window.jQuery) {
+      jQuery(function ($) {
+        $('.variations_form').on('show_variation found_variation reset_data woocommerce_variation_has_changed check_variations', function () {
+          setTimeout(keepDesignRequestButtonsClickable, 50);
+        });
+      });
+    }
+  }
 
   function initZcQuantityAndButtons() {
     const formArea = document.querySelector('[data-zc-product-form-area]');

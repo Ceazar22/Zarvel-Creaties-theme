@@ -20,6 +20,39 @@ function zarvel_get_current_path() {
 }
 
 /**
+ * Find first existing template.
+ */
+function zarvel_find_existing_template($template_paths) {
+    foreach ($template_paths as $template_path) {
+        if (file_exists($template_path)) {
+            return $template_path;
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Prepare custom routed theme page.
+ *
+ * Important:
+ * Do NOT set is_page or is_singular here.
+ * These custom pages are not real WordPress posts.
+ * Setting is_page=true without a post object causes body_class()
+ * warnings inside wp-includes/post-template.php.
+ */
+function zarvel_prepare_theme_only_page() {
+    global $wp_query;
+
+    if ($wp_query) {
+        $wp_query->is_404 = false;
+    }
+
+    status_header(200);
+    nocache_headers();
+}
+
+/**
  * Custom template router.
  */
 function zarvel_custom_template_router($template) {
@@ -27,12 +60,27 @@ function zarvel_custom_template_router($template) {
         return $template;
     }
 
-    $front_page_template       = get_template_directory() . '/pages/front-page.php';
-    $single_product_template   = get_template_directory() . '/pages/single-product.php';
-    $product_category_template = get_template_directory() . '/pages/product-category.php';
-    $customize_template        = get_template_directory() . '/pages/customize.php';
-    $about_template            = get_template_directory() . '/pages/about-us.php';
-    $contact_template          = get_template_directory() . '/pages/contact.php';
+    $theme_dir = get_template_directory();
+
+    $front_page_template       = $theme_dir . '/pages/front-page.php';
+    $single_product_template   = $theme_dir . '/pages/single-product.php';
+    $product_category_template = $theme_dir . '/pages/product-category.php';
+    $customize_template        = $theme_dir . '/pages/customize.php';
+    $about_template            = $theme_dir . '/pages/about-us.php';
+    $contact_template          = $theme_dir . '/pages/contact.php';
+
+    /**
+     * Design Studio template.
+     *
+     * Use this file if possible:
+     * /pages/page-design-studio.php
+     */
+    $design_studio_template = zarvel_find_existing_template([
+        $theme_dir . '/pages/page-design-studio.php',
+        $theme_dir . '/pages/design-studio.php',
+        $theme_dir . '/page-design-studio.php',
+        $theme_dir . '/page-designstudio.php',
+    ]);
 
     $current_path = zarvel_get_current_path();
 
@@ -41,15 +89,26 @@ function zarvel_custom_template_router($template) {
      * URL: /customize/
      */
     if ($current_path === 'customize' && file_exists($customize_template)) {
-        global $wp_query;
-
-        if ($wp_query) {
-            $wp_query->is_404 = false;
-        }
-
-        status_header(200);
-
+        zarvel_prepare_theme_only_page();
         return $customize_template;
+    }
+
+    /**
+     * Theme-only Design Studio page.
+     *
+     * Main URL:
+     * /page-design-studio/
+     *
+     * Also supports:
+     * /design-studio/
+     * /page-designstudio/
+     */
+    if (
+        in_array($current_path, ['page-design-studio', 'design-studio', 'page-designstudio'], true) &&
+        $design_studio_template
+    ) {
+        zarvel_prepare_theme_only_page();
+        return $design_studio_template;
     }
 
     /**
@@ -57,14 +116,7 @@ function zarvel_custom_template_router($template) {
      * URL: /about-us/
      */
     if ($current_path === 'about-us' && file_exists($about_template)) {
-        global $wp_query;
-
-        if ($wp_query) {
-            $wp_query->is_404 = false;
-        }
-
-        status_header(200);
-
+        zarvel_prepare_theme_only_page();
         return $about_template;
     }
 
@@ -73,14 +125,7 @@ function zarvel_custom_template_router($template) {
      * URL: /contact/
      */
     if ($current_path === 'contact' && file_exists($contact_template)) {
-        global $wp_query;
-
-        if ($wp_query) {
-            $wp_query->is_404 = false;
-        }
-
-        status_header(200);
-
+        zarvel_prepare_theme_only_page();
         return $contact_template;
     }
 
