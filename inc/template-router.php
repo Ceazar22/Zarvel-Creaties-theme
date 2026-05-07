@@ -53,6 +53,82 @@ function zarvel_prepare_theme_only_page() {
 }
 
 /**
+ * Resolve theme-only route templates.
+ */
+function zarvel_get_theme_only_route_template($current_path) {
+    $theme_dir = get_template_directory();
+
+    $routes = array(
+        'customize'       => $theme_dir . '/pages/customize.php',
+        'our-services'    => $theme_dir . '/pages/our-services.php',
+        'about-us'        => $theme_dir . '/pages/about-us.php',
+        'contact'         => $theme_dir . '/pages/contact.php',
+        'shop'            => $theme_dir . '/pages/shop.php',
+        'cart'            => $theme_dir . '/pages/cart.php',
+        'about'           => $theme_dir . '/pages/info-page.php',
+        'shipping-policy' => $theme_dir . '/pages/info-page.php',
+        'return-policy'   => $theme_dir . '/pages/info-page.php',
+        'refund-policy'   => $theme_dir . '/pages/info-page.php',
+        'faqs'            => $theme_dir . '/pages/info-page.php',
+        'size-guide'      => $theme_dir . '/pages/info-page.php',
+        'track-order'     => $theme_dir . '/pages/info-page.php',
+        'our-process'     => $theme_dir . '/pages/info-page.php',
+        'careers'         => $theme_dir . '/pages/info-page.php',
+        'blog'            => $theme_dir . '/pages/info-page.php',
+        'terms-of-service'=> $theme_dir . '/pages/info-page.php',
+        'privacy-policy'  => $theme_dir . '/pages/info-page.php',
+    );
+
+    if ($current_path === 'checkout' || strpos($current_path, 'checkout/') === 0) {
+        return zarvel_find_existing_template(array($theme_dir . '/pages/checkout.php'));
+    }
+
+    if ($current_path === 'my-account' || strpos($current_path, 'my-account/') === 0) {
+        return zarvel_find_existing_template(array($theme_dir . '/pages/my-account.php'));
+    }
+
+    if (in_array($current_path, array('page-design-studio', 'design-studio', 'page-designstudio'), true)) {
+        return zarvel_find_existing_template(array(
+            $theme_dir . '/pages/page-design-studio.php',
+            $theme_dir . '/pages/design-studio.php',
+            $theme_dir . '/page-design-studio.php',
+            $theme_dir . '/page-designstudio.php',
+        ));
+    }
+
+    if (!empty($routes[$current_path])) {
+        return zarvel_find_existing_template(array($routes[$current_path]));
+    }
+
+    return '';
+}
+
+/**
+ * Render theme-only PHP pages before block/404 fallback templates can take over.
+ */
+function zarvel_render_theme_only_route() {
+    if (
+        is_admin() ||
+        wp_doing_ajax() ||
+        (defined('REST_REQUEST') && REST_REQUEST) ||
+        ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    ) {
+        return;
+    }
+
+    $template = zarvel_get_theme_only_route_template(zarvel_get_current_path());
+
+    if (!$template) {
+        return;
+    }
+
+    zarvel_prepare_theme_only_page();
+    include $template;
+    exit;
+}
+add_action('template_redirect', 'zarvel_render_theme_only_route', 20);
+
+/**
  * Custom template router.
  */
 function zarvel_custom_template_router($template) {
@@ -186,6 +262,7 @@ function zarvel_custom_template_router($template) {
             [
                 'about',
                 'shipping-policy',
+                'return-policy',
                 'refund-policy',
                 'faqs',
                 'size-guide',

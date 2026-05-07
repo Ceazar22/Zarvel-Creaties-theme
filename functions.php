@@ -59,6 +59,55 @@ function zarvel_get_shop_categories($limit = 0) {
 }
 
 /**
+ * Shipping rule:
+ * - United States: free shipping.
+ * - Outside United States: do not override Printful/WooCommerce live shipping rates.
+ */
+function zarvel_is_us_shipping_destination($package) {
+    $country = '';
+
+    if (!empty($package['destination']['country'])) {
+        $country = $package['destination']['country'];
+    } elseif (function_exists('WC') && WC()->customer) {
+        $country = WC()->customer->get_shipping_country() ?: WC()->customer->get_billing_country();
+    }
+
+    return strtoupper((string) $country) === 'US';
+}
+
+add_filter('woocommerce_package_rates', function ($rates, $package) {
+    if (!is_array($rates)) {
+        return $rates;
+    }
+
+    if (zarvel_is_us_shipping_destination($package)) {
+        $free_rate_id = 'zarvel_free_us_shipping';
+
+        return array(
+            $free_rate_id => new WC_Shipping_Rate(
+                $free_rate_id,
+                __('Free Shipping (USA)', 'zarvel-creative'),
+                0,
+                array(),
+                'zarvel_free_us_shipping'
+            ),
+        );
+    }
+
+    foreach ($rates as $rate_id => $rate) {
+        if (is_object($rate) && method_exists($rate, 'get_method_id') && $rate->get_method_id() === 'free_shipping') {
+            unset($rates[$rate_id]);
+        }
+
+        if ($rate_id === 'zarvel_free_us_shipping') {
+            unset($rates[$rate_id]);
+        }
+    }
+
+    return $rates;
+}, 100, 2);
+
+/**
  * Side cart quantity controls.
  */
 add_action('template_redirect', function () {

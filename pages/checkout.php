@@ -84,7 +84,7 @@ if (function_exists('WC') && WC()->cart) {
           </div>
           <div>
             <span>Shipping</span>
-            <strong>Calculated at checkout</strong>
+            <strong>US free / International calculated</strong>
           </div>
           <hr>
           <div class="zc-checkout-total__final">

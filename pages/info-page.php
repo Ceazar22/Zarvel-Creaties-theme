@@ -17,21 +17,31 @@ $pages = array(
     'shipping-policy' => array(
         'eyebrow' => 'Support',
         'title' => 'Shipping Policy',
-        'intro' => 'Clear shipping expectations for custom, made-on-demand products.',
+        'intro' => 'Free shipping is available for United States orders. International shipping is calculated at checkout using Printful-supported rates when available.',
         'sections' => array(
-            array('title' => 'Processing', 'body' => 'Most custom orders need production time before shipment. Processing time can vary by product type, order size, and artwork review.'),
-            array('title' => 'Delivery', 'body' => 'Shipping rates and timelines are calculated at checkout when available. Delivery estimates start after production is complete.'),
-            array('title' => 'Tracking', 'body' => 'When tracking is available, it will be sent to the customer email used during checkout.'),
+            array('title' => 'Free USA shipping', 'body' => 'Orders shipped to addresses in the United States receive free shipping at checkout. Production time still applies before the order ships.'),
+            array('title' => 'International shipping', 'body' => 'For addresses outside the United States, shipping is calculated at checkout based on destination, product type, package size, and available Printful shipping methods.'),
+            array('title' => 'Tracking', 'body' => 'When tracking is available, it will be sent to the customer email used during checkout after the order has been fulfilled and handed to the carrier.'),
+        ),
+    ),
+    'return-policy' => array(
+        'eyebrow' => 'Support',
+        'title' => 'Return Policy',
+        'intro' => 'Our products are custom made on demand, so returns are handled differently from regular retail items.',
+        'sections' => array(
+            array('title' => 'Custom orders', 'body' => 'Because each product is made for the customer, we do not accept returns or exchanges for wrong size, wrong color, buyer preference, or change of mind.'),
+            array('title' => 'Damaged or defective items', 'body' => 'If your item arrives damaged, misprinted, defective, or affected by a manufacturing issue, contact us with your order number and clear photos within 30 days of delivery.'),
+            array('title' => 'Resolution', 'body' => 'Approved quality claims may be resolved with a replacement, reprint, or refund depending on the issue and Printful fulfillment review. You usually do not need to return the damaged product.'),
         ),
     ),
     'refund-policy' => array(
         'eyebrow' => 'Support',
-        'title' => 'Refund Policy',
-        'intro' => 'Because custom products are made for each order, refunds are handled carefully and fairly.',
+        'title' => 'Return Policy',
+        'intro' => 'Our products are custom made on demand, so returns are handled differently from regular retail items.',
         'sections' => array(
-            array('title' => 'Custom orders', 'body' => 'Personalized items usually cannot be returned for buyer preference, incorrect size selection, or design choices approved by the customer.'),
-            array('title' => 'Damaged or incorrect items', 'body' => 'If an item arrives damaged, misprinted, or different from the confirmed order, contact support with photos and order details.'),
-            array('title' => 'Review window', 'body' => 'Please report order issues as soon as possible so the team can review the case and provide the best next step.'),
+            array('title' => 'Custom orders', 'body' => 'Because each product is made for the customer, we do not accept returns or exchanges for wrong size, wrong color, buyer preference, or change of mind.'),
+            array('title' => 'Damaged or defective items', 'body' => 'If your item arrives damaged, misprinted, defective, or affected by a manufacturing issue, contact us with your order number and clear photos within 30 days of delivery.'),
+            array('title' => 'Resolution', 'body' => 'Approved quality claims may be resolved with a replacement, reprint, or refund depending on the issue and Printful fulfillment review. You usually do not need to return the damaged product.'),
         ),
     ),
     'faqs' => array(
@@ -96,22 +106,22 @@ $pages = array(
     ),
     'terms-of-service' => array(
         'eyebrow' => 'Legal',
-        'title' => 'Terms of Service',
-        'intro' => 'Basic terms for using this website and placing custom product orders.',
+        'title' => 'Terms and Conditions',
+        'intro' => 'These terms explain how custom product, design, and website service orders work through Zarvel Creatives.',
         'sections' => array(
-            array('title' => 'Customer content', 'body' => 'Customers are responsible for having the rights to upload and print the artwork, text, logos, or images they submit.'),
-            array('title' => 'Order accuracy', 'body' => 'Please review product options, quantities, shipping details, and design placement before checkout.'),
-            array('title' => 'Service changes', 'body' => 'Product availability, pricing, and fulfillment timelines may change as supplier and production conditions change.'),
+            array('title' => 'Customer content', 'body' => 'Customers are responsible for having the rights to upload, print, publish, or use the artwork, text, logos, images, and brand assets they submit.'),
+            array('title' => 'Custom product orders', 'body' => 'Please review product options, quantities, sizes, colors, shipping address, and design placement before checkout. Made-on-demand products may not be returnable for preference or selection mistakes.'),
+            array('title' => 'Services and availability', 'body' => 'Product availability, pricing, shipping methods, production timelines, design services, Shopify work, WordPress work, and WooCommerce work may change based on supplier, platform, and project requirements.'),
         ),
     ),
     'privacy-policy' => array(
         'eyebrow' => 'Legal',
         'title' => 'Privacy Policy',
-        'intro' => 'A plain-language overview of how customer information is used for orders and support.',
+        'intro' => 'A plain-language overview of how customer information is used for orders, fulfillment, support, and service requests.',
         'sections' => array(
-            array('title' => 'Information collected', 'body' => 'Checkout details, contact information, order contents, and uploaded design data may be used to process custom orders.'),
-            array('title' => 'How it is used', 'body' => 'Information is used for fulfillment, payment processing, customer support, and order communication.'),
-            array('title' => 'Support requests', 'body' => 'When contacting support, include only the details needed to resolve your issue.'),
+            array('title' => 'Information collected', 'body' => 'We may collect checkout details, contact information, shipping address, order contents, uploaded design files, project notes, and messages submitted through forms.'),
+            array('title' => 'How it is used', 'body' => 'Information is used to process payments, fulfill orders, calculate shipping, send order updates, provide customer support, and complete requested design or website services.'),
+            array('title' => 'Service providers', 'body' => 'Order and fulfillment information may be shared with service providers such as WooCommerce, payment processors, Printful, shipping carriers, email providers, Shopify, or WordPress-related tools when needed to deliver the service.'),
         ),
     ),
 );

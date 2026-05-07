@@ -169,7 +169,6 @@
 <?php
 $zc_cart_count = 0;
 $zc_cart_subtotal = 0;
-$zc_free_shipping_threshold = 50;
 $zc_cart_items = array();
 $zc_cart_url = function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart');
 $zc_checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout');
@@ -180,19 +179,9 @@ if (function_exists('WC') && WC()->cart) {
   $zc_cart_items = WC()->cart->get_cart();
 }
 
-$zc_free_shipping_remaining = max(0, $zc_free_shipping_threshold - $zc_cart_subtotal);
-$zc_free_shipping_progress = $zc_free_shipping_threshold > 0
-  ? min(100, ($zc_cart_subtotal / $zc_free_shipping_threshold) * 100)
-  : 100;
-$zc_free_shipping_remaining_html = function_exists('wc_price')
-  ? wc_price($zc_free_shipping_remaining)
-  : '$' . number_format($zc_free_shipping_remaining, 2);
 $zc_cart_subtotal_html = function_exists('wc_price')
   ? wc_price($zc_cart_subtotal)
   : '$' . number_format($zc_cart_subtotal, 2);
-$zc_free_shipping_threshold_html = function_exists('wc_price')
-  ? wc_price($zc_free_shipping_threshold)
-  : '$' . number_format($zc_free_shipping_threshold, 2);
 ?>
 
 <div class="zc-sidecart" data-zc-sidecart aria-hidden="true">
@@ -218,17 +207,12 @@ $zc_free_shipping_threshold_html = function_exists('wc_price')
         </svg>
       </div>
       <div class="zc-sidecart__ship-copy">
-        <?php if ($zc_free_shipping_remaining > 0) : ?>
-          <strong>You're <?php echo wp_kses_post($zc_free_shipping_remaining_html); ?> away from <span>FREE</span> shipping!</strong>
-        <?php else : ?>
-          <strong>You unlocked <span>FREE</span> shipping!</strong>
-        <?php endif; ?>
+        <strong><span>FREE</span> shipping in the USA</strong>
         <div class="zc-sidecart__progress">
-          <span style="width: <?php echo esc_attr($zc_free_shipping_progress); ?>%;"></span>
+          <span style="width: 100%;"></span>
         </div>
         <p>
-          <b><?php echo wp_kses_post($zc_cart_subtotal_html); ?></b>
-          / <?php echo wp_kses_post($zc_free_shipping_threshold_html); ?>
+          International shipping is calculated at checkout using Printful rates.
         </p>
       </div>
     </div>
@@ -360,7 +344,7 @@ $zc_free_shipping_threshold_html = function_exists('wc_price')
       </div>
       <div>
         <span>Shipping</span>
-        <strong class="zc-sidecart__free">FREE</strong>
+        <strong class="zc-sidecart__free">US free / Intl calculated</strong>
       </div>
       <hr>
       <div class="zc-sidecart__total">

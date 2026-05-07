@@ -104,7 +104,7 @@ if (function_exists('WC') && WC()->cart) {
 
         <div>
           <span>Shipping</span>
-          <strong>Calculated at checkout</strong>
+          <strong>US free / International calculated</strong>
         </div>
 
         <hr>

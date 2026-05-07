@@ -81,7 +81,7 @@
         <ul>
           <li><a href="<?php echo esc_url(home_url('/contact')); ?>">Contact Us</a></li>
           <li><a href="<?php echo esc_url(home_url('/shipping-policy')); ?>">Shipping Policy</a></li>
-          <li><a href="<?php echo esc_url(home_url('/refund-policy')); ?>">Refund Policy</a></li>
+          <li><a href="<?php echo esc_url(home_url('/return-policy')); ?>">Return Policy</a></li>
           <li><a href="<?php echo esc_url(home_url('/faqs')); ?>">FAQs</a></li>
           <li><a href="<?php echo esc_url(home_url('/size-guide')); ?>">Size Guide</a></li>
           <li><a href="<?php echo esc_url(home_url('/track-order')); ?>">Track Your Order</a></li>
