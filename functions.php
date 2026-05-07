@@ -24,64 +24,179 @@ zarvel_require_file('/inc/theme-setup.php');
 zarvel_require_file('/inc/smtp.php');
 zarvel_require_file('/inc/customize-form-handler.php');
 zarvel_require_file('/inc/template-router.php');
+zarvel_require_file('/inc/security-hardening.php');
 
 /**
- * Basic security headers.
- * Keep this light so WooCommerce / Printful / admin stuff does not break.
+ * Get real WooCommerce product categories for theme navigation.
  */
-add_action('send_headers', function () {
-    if (headers_sent()) {
-        return;
+function zarvel_get_shop_categories($limit = 0) {
+    if (!taxonomy_exists('product_cat')) {
+        return array();
     }
 
-    header('X-Content-Type-Options: nosniff');
-    header('X-Frame-Options: SAMEORIGIN');
-    header('Referrer-Policy: strict-origin-when-cross-origin');
-    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-});
+    $terms = get_terms(array(
+        'taxonomy'   => 'product_cat',
+        'hide_empty' => false,
+        'parent'     => 0,
+        'orderby'    => 'menu_order',
+        'order'      => 'ASC',
+        'exclude'    => array((int) get_option('default_product_cat')),
+    ));
+
+    if (is_wp_error($terms) || empty($terms)) {
+        return array();
+    }
+
+    $terms = array_values(array_filter($terms, function ($term) {
+        return !empty($term->slug) && $term->slug !== 'uncategorized';
+    }));
+
+    if ($limit > 0) {
+        $terms = array_slice($terms, 0, $limit);
+    }
+
+    return $terms;
+}
 
 /**
- * Disable XML-RPC if you are not using Jetpack, WordPress mobile app,
- * or external apps that need XML-RPC.
- */
-add_filter('xmlrpc_enabled', '__return_false');
-
-/**
- * Block simple author ID scanning like:
- * yoursite.com/?author=1
+ * Side cart quantity controls.
  */
 add_action('template_redirect', function () {
-    if (is_admin() || wp_doing_ajax() || (defined('REST_REQUEST') && REST_REQUEST)) {
+    if (
+        is_admin() ||
+        !function_exists('WC') ||
+        !WC()->cart ||
+        empty($_GET['zc_cart_item']) ||
+        !isset($_GET['zc_qty'])
+    ) {
         return;
     }
 
-    if (isset($_GET['author']) && preg_match('/^\d+$/', (string) $_GET['author'])) {
-        wp_safe_redirect(home_url('/'), 301);
-        exit;
+    $cart_item_key = sanitize_text_field(wp_unslash($_GET['zc_cart_item']));
+    $quantity = max(0, absint(wp_unslash($_GET['zc_qty'])));
+    $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field(wp_unslash($_GET['_wpnonce'])) : '';
+
+    if (!wp_verify_nonce($nonce, 'zc_sidecart_qty_' . $cart_item_key)) {
+        return;
     }
+
+    if (!isset(WC()->cart->cart_contents[$cart_item_key])) {
+        return;
+    }
+
+    WC()->cart->set_quantity($cart_item_key, $quantity, true);
+
+    $redirect_url = remove_query_arg(array('zc_cart_item', 'zc_qty', '_wpnonce'));
+    wp_safe_redirect($redirect_url ?: home_url('/'));
+    exit;
 });
 
 /**
- * Block anonymous REST API user listing.
- * Helps hide usernames from:
- * /wp-json/wp/v2/users
+ * Add customizer design to WooCommerce cart.
  */
-add_filter('rest_authentication_errors', function ($result) {
-    if (!empty($result)) {
-        return $result;
+function zarvel_customizer_add_to_cart_ajax() {
+    if (!function_exists('WC')) {
+        wp_send_json_error(array('message' => 'WooCommerce is unavailable.'), 400);
     }
 
-    $request_uri = isset($_SERVER['REQUEST_URI'])
-        ? sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI']))
-        : '';
-
-    if (!is_user_logged_in() && preg_match('#/wp-json/wp/v2/users#i', $request_uri)) {
-        return new WP_Error(
-            'zarvel_rest_users_blocked',
-            __('REST user access blocked.', 'zarvel-creative'),
-            array('status' => 401)
-        );
+    if (!WC()->cart && function_exists('wc_load_cart')) {
+        wc_load_cart();
     }
 
-    return $result;
-});
+    if (!WC()->cart) {
+        wp_send_json_error(array('message' => 'WooCommerce cart is unavailable.'), 400);
+    }
+
+    $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+
+    if (!wp_verify_nonce($nonce, 'zc_customizer_add_to_cart')) {
+        wp_send_json_error(array('message' => 'Security check failed. Please refresh and try again.'), 403);
+    }
+
+    $product_id = isset($_POST['product_id']) ? absint(wp_unslash($_POST['product_id'])) : 0;
+    $variation_id = isset($_POST['variation_id']) ? absint(wp_unslash($_POST['variation_id'])) : 0;
+    $quantity = isset($_POST['quantity']) ? max(1, absint(wp_unslash($_POST['quantity']))) : 1;
+    $design_title = isset($_POST['design_title'])
+        ? sanitize_text_field(wp_unslash($_POST['design_title']))
+        : __('Untitled Design', 'zarvel-creative');
+    $imprint = isset($_POST['imprint']) ? sanitize_text_field(wp_unslash($_POST['imprint'])) : '';
+    $imprint_size = isset($_POST['imprint_size']) ? sanitize_text_field(wp_unslash($_POST['imprint_size'])) : '';
+
+    $product = wc_get_product($product_id);
+
+    if (!$product) {
+        wp_send_json_error(array('message' => 'Product was not found.'), 404);
+    }
+
+    $variation_attributes = array();
+
+    if ($variation_id) {
+        $variation = wc_get_product($variation_id);
+
+        if (!$variation || !$variation instanceof WC_Product_Variation) {
+            wp_send_json_error(array('message' => 'Selected variation was not found.'), 404);
+        }
+
+        $variation_attributes = $variation->get_variation_attributes();
+    }
+
+    $cart_item_data = array(
+        'zc_custom_design' => true,
+        'zc_design_title'  => $design_title,
+        'zc_imprint'       => $imprint,
+        'zc_imprint_size'  => $imprint_size,
+        'zc_design_key'    => md5(wp_json_encode(array(
+            'product_id'    => $product_id,
+            'variation_id'  => $variation_id,
+            'design_title'  => $design_title,
+            'imprint'       => $imprint,
+            'imprint_size'  => $imprint_size,
+            'time'          => microtime(true),
+        ))),
+    );
+
+    $added_key = WC()->cart->add_to_cart(
+        $product_id,
+        $quantity,
+        $variation_id,
+        $variation_attributes,
+        $cart_item_data
+    );
+
+    if (!$added_key) {
+        wp_send_json_error(array('message' => 'Could not add custom design to cart.'), 400);
+    }
+
+    WC()->cart->calculate_totals();
+
+    $redirect_url = wp_get_referer() ?: home_url('/');
+    $redirect_url = add_query_arg('zc_open_cart', '1', $redirect_url);
+
+    wp_send_json_success(array(
+        'cart_url' => $redirect_url,
+        'count'    => WC()->cart->get_cart_contents_count(),
+    ));
+}
+add_action('wp_ajax_zc_customizer_add_to_cart', 'zarvel_customizer_add_to_cart_ajax');
+add_action('wp_ajax_nopriv_zc_customizer_add_to_cart', 'zarvel_customizer_add_to_cart_ajax');
+
+/**
+ * Persist custom design summary on checkout/order line items.
+ */
+add_action('woocommerce_checkout_create_order_line_item', function ($item, $cart_item_key, $values) {
+    if (empty($values['zc_custom_design'])) {
+        return;
+    }
+
+    if (!empty($values['zc_design_title'])) {
+        $item->add_meta_data(__('Design title', 'zarvel-creative'), $values['zc_design_title']);
+    }
+
+    if (!empty($values['zc_imprint'])) {
+        $item->add_meta_data(__('Imprint', 'zarvel-creative'), $values['zc_imprint']);
+    }
+
+    if (!empty($values['zc_imprint_size'])) {
+        $item->add_meta_data(__('Imprint size', 'zarvel-creative'), $values['zc_imprint_size']);
+    }
+}, 10, 3);

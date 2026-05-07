@@ -37,7 +37,6 @@ function zarvel_configure_smtp_mailer($phpmailer) {
     $phpmailer->FromName   = ZARVEL_SMTP_FROM_NAME;
     $phpmailer->Sender     = ZARVEL_SMTP_FROM;
 
-    error_log('Zarvel SMTP loaded: using Gmail SMTP.');
 }
 add_action('phpmailer_init', 'zarvel_configure_smtp_mailer');
 

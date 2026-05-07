@@ -66,8 +66,14 @@ function zarvel_custom_template_router($template) {
     $single_product_template   = $theme_dir . '/pages/single-product.php';
     $product_category_template = $theme_dir . '/pages/product-category.php';
     $customize_template        = $theme_dir . '/pages/customize.php';
+    $services_template         = $theme_dir . '/pages/our-services.php';
     $about_template            = $theme_dir . '/pages/about-us.php';
     $contact_template          = $theme_dir . '/pages/contact.php';
+    $shop_template             = $theme_dir . '/pages/shop.php';
+    $cart_template             = $theme_dir . '/pages/cart.php';
+    $checkout_template         = $theme_dir . '/pages/checkout.php';
+    $account_template          = $theme_dir . '/pages/my-account.php';
+    $info_template             = $theme_dir . '/pages/info-page.php';
 
     /**
      * Design Studio template.
@@ -91,6 +97,15 @@ function zarvel_custom_template_router($template) {
     if ($current_path === 'customize' && file_exists($customize_template)) {
         zarvel_prepare_theme_only_page();
         return $customize_template;
+    }
+
+    /**
+     * Theme-only Our Services page.
+     * URL: /our-services/
+     */
+    if ($current_path === 'our-services' && file_exists($services_template)) {
+        zarvel_prepare_theme_only_page();
+        return $services_template;
     }
 
     /**
@@ -127,6 +142,66 @@ function zarvel_custom_template_router($template) {
     if ($current_path === 'contact' && file_exists($contact_template)) {
         zarvel_prepare_theme_only_page();
         return $contact_template;
+    }
+
+    /**
+     * Theme-only Shop page.
+     * URL: /shop/
+     */
+    if ($current_path === 'shop' && file_exists($shop_template)) {
+        zarvel_prepare_theme_only_page();
+        return $shop_template;
+    }
+
+    /**
+     * Theme-only WooCommerce utility pages.
+     */
+    if ($current_path === 'cart' && file_exists($cart_template)) {
+        zarvel_prepare_theme_only_page();
+        return $cart_template;
+    }
+
+    if (
+        ($current_path === 'checkout' || strpos($current_path, 'checkout/') === 0) &&
+        file_exists($checkout_template)
+    ) {
+        zarvel_prepare_theme_only_page();
+        return $checkout_template;
+    }
+
+    if (
+        ($current_path === 'my-account' || strpos($current_path, 'my-account/') === 0) &&
+        file_exists($account_template)
+    ) {
+        zarvel_prepare_theme_only_page();
+        return $account_template;
+    }
+
+    /**
+     * Theme-only static support/company pages.
+     */
+    if (
+        in_array(
+            $current_path,
+            [
+                'about',
+                'shipping-policy',
+                'refund-policy',
+                'faqs',
+                'size-guide',
+                'track-order',
+                'our-process',
+                'careers',
+                'blog',
+                'terms-of-service',
+                'privacy-policy',
+            ],
+            true
+        ) &&
+        file_exists($info_template)
+    ) {
+        zarvel_prepare_theme_only_page();
+        return $info_template;
     }
 
     /**

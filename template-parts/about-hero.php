@@ -1,8 +1,8 @@
 <?php
 defined('ABSPATH') || exit;
 
-$customize_url = home_url('/customize/');
-$shop_url      = home_url('/shop/');
+$services_url = home_url('/our-services/');
+$contact_url  = home_url('/contact/');
 ?>
 
 <section class="zc-about-hero">
@@ -18,22 +18,22 @@ $shop_url      = home_url('/shop/');
       <span class="zc-about-hero__kicker">Our Story</span>
 
       <h1 class="zc-about-hero__title">
-        We’re Here To Help<br>
-        You Wear Your Story.
+        <span>Creative Ideas</span>
+        <strong>Made Real</strong>
       </h1>
 
       <p class="zc-about-hero__text">
-        Printly was built for creators, dreamers, and doers who want more than just ordinary.
-        We turn ideas into high-quality prints you’ll love.
+        Zarvel Creatives helps people turn rough ideas into custom products, clean graphics,
+        and websites built with Shopify, WordPress, and WooCommerce.
       </p>
 
       <div class="zc-about-hero__buttons">
-        <a href="<?php echo esc_url($customize_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--orange">
-          Start Customizing
+        <a href="<?php echo esc_url($services_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--orange">
+          Our Services
         </a>
 
-        <a href="<?php echo esc_url($shop_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--dark">
-          Shop Products
+        <a href="<?php echo esc_url($contact_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--dark">
+          Start a Project
           <span>→</span>
         </a>
       </div>
@@ -45,7 +45,7 @@ $shop_url      = home_url('/shop/');
 <style>
 .zc-about-hero {
   width: 100%;
-  padding: 38px 0 72px;
+  padding: 38px 0 64px;
   background:
     radial-gradient(circle at 88% 18%, rgba(255, 91, 26, 0.1), transparent 30%),
     linear-gradient(90deg, #ffffff 0%, #fff8f4 100%);
@@ -62,7 +62,7 @@ $shop_url      = home_url('/shop/');
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 34px;
+  margin-bottom: 20px;
   color: #8a8a8a;
   font-size: 12px;
   line-height: 1.2;
@@ -88,12 +88,14 @@ $shop_url      = home_url('/shop/');
 }
 
 .zc-about-hero__content {
-  max-width: 590px;
+  max-width: 820px;
+  margin: 0 auto;
+  text-align: center;
 }
 
 .zc-about-hero__kicker {
   display: inline-block;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   color: #ff5b1a;
   font-size: 12px;
   line-height: 1;
@@ -104,16 +106,26 @@ $shop_url      = home_url('/shop/');
 .zc-about-hero__title {
   margin: 0;
   color: #111111;
-  font-size: clamp(42px, 5.8vw, 76px);
-  line-height: 0.92;
+  font-size: clamp(48px, 7vw, 88px);
+  line-height: 0.95;
   font-weight: 950;
-  letter-spacing: -1.8px;
+  letter-spacing: -2px;
   text-transform: uppercase;
 }
 
+.zc-about-hero__title span,
+.zc-about-hero__title strong {
+  display: block;
+}
+
+.zc-about-hero__title strong {
+  color: #ff5b1a;
+  font-weight: 950;
+}
+
 .zc-about-hero__text {
-  max-width: 470px;
-  margin: 24px 0 26px;
+  max-width: 660px;
+  margin: 22px auto 0;
   color: #333333;
   font-size: 17px;
   line-height: 1.6;
@@ -123,8 +135,10 @@ $shop_url      = home_url('/shop/');
 .zc-about-hero__buttons {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-top: 28px;
 }
 
 .zc-about-hero__btn {

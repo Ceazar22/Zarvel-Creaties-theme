@@ -13,6 +13,19 @@ if (!$product) {
 
 wp_enqueue_script('wc-add-to-cart-variation');
 
+$zc_blank_products_url = home_url('/shop/');
+$zc_blank_categories = function_exists('zarvel_get_shop_categories')
+  ? zarvel_get_shop_categories(1)
+  : array();
+
+if (!empty($zc_blank_categories)) {
+  $zc_blank_category_url = get_term_link($zc_blank_categories[0]);
+
+  if (!is_wp_error($zc_blank_category_url)) {
+    $zc_blank_products_url = $zc_blank_category_url;
+  }
+}
+
 if (!function_exists('zc_sp_normalize_key')) {
   function zc_sp_normalize_key($value) {
     $value = strtolower(remove_accents((string) $value));
@@ -442,7 +455,7 @@ $zc_customizer_url = home_url('/page-design-studio/');
           remove_filter('woocommerce_product_single_add_to_cart_text', $button_text_filter);
           ?>
 
-          <a href="<?php echo esc_url(home_url('/product-category/t-shirts')); ?>" class="zc-shop-blank-btn" data-zc-shop-blank-btn>
+          <a href="<?php echo esc_url($zc_blank_products_url); ?>" class="zc-shop-blank-btn" data-zc-shop-blank-btn>
             SHOP BLANK SHIRTS
           </a>
         </div>

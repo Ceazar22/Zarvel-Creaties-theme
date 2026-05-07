@@ -51,12 +51,26 @@
         <h3>SHOP</h3>
 
         <ul>
-          <li><a href="<?php echo esc_url(home_url('/product-category/t-shirts')); ?>">T-Shirts</a></li>
-          <li><a href="<?php echo esc_url(home_url('/product-category/hoodies')); ?>">Hoodies</a></li>
-          <li><a href="<?php echo esc_url(home_url('/product-category/mugs')); ?>">Mugs</a></li>
-          <li><a href="<?php echo esc_url(home_url('/product-category/tote-bags')); ?>">Tote Bags</a></li>
-          <li><a href="<?php echo esc_url(home_url('/product-category/phone-cases')); ?>">Phone Cases</a></li>
-          <li><a href="<?php echo esc_url(home_url('/product-category/posters')); ?>">Posters</a></li>
+          <?php
+          $zc_footer_categories = function_exists('zarvel_get_shop_categories')
+            ? zarvel_get_shop_categories(6)
+            : array();
+          ?>
+
+          <?php if (!empty($zc_footer_categories)) : ?>
+            <?php foreach ($zc_footer_categories as $zc_footer_category) : ?>
+              <?php $zc_footer_category_url = get_term_link($zc_footer_category); ?>
+              <?php if (!is_wp_error($zc_footer_category_url)) : ?>
+                <li>
+                  <a href="<?php echo esc_url($zc_footer_category_url); ?>">
+                    <?php echo esc_html($zc_footer_category->name); ?>
+                  </a>
+                </li>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          <?php else : ?>
+            <li><a href="<?php echo esc_url(home_url('/shop')); ?>">All Products</a></li>
+          <?php endif; ?>
         </ul>
       </div>
 
@@ -79,7 +93,8 @@
         <h3>COMPANY</h3>
 
         <ul>
-          <li><a href="<?php echo esc_url(home_url('/about')); ?>">About Us</a></li>
+          <li><a href="<?php echo esc_url(home_url('/about-us')); ?>">About Us</a></li>
+          <li><a href="<?php echo esc_url(home_url('/our-services')); ?>">Our Services</a></li>
           <li><a href="<?php echo esc_url(home_url('/our-process')); ?>">Our Process</a></li>
           <li><a href="<?php echo esc_url(home_url('/careers')); ?>">Careers</a></li>
           <li><a href="<?php echo esc_url(home_url('/blog')); ?>">Blog</a></li>

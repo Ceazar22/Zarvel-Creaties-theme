@@ -106,8 +106,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
 <section class="zc-product-customizer" data-zc-customizer>
   <style>
     .zc-product-customizer {
-      padding: 60px 20px;
-      background: #f7f4ef;
+      min-height: 100vh;
+      padding: 0;
+      background: #f5f5f5;
     }
 
     .zc-product-customizer * {
@@ -115,24 +116,27 @@ $currency_symbol = get_woocommerce_currency_symbol();
     }
 
     .zc-product-customizer__inner {
-      max-width: 1320px;
-      margin: 0 auto;
+      width: 100%;
+      min-height: 100vh;
+      margin: 0;
       display: grid;
-      grid-template-columns: 420px minmax(0, 1fr);
-      gap: 28px;
-      align-items: start;
+      grid-template-columns: 390px minmax(0, 1fr);
+      gap: 0;
+      align-items: stretch;
     }
 
     .zc-product-customizer__panel,
     .zc-product-customizer__preview {
       background: #fff;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 24px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     .zc-product-customizer__panel {
-      overflow: hidden;
+      height: 100vh;
+      overflow: auto;
+      border-right: 1px solid rgba(0, 0, 0, 0.08);
     }
 
     .zc-product-customizer__header {
@@ -283,6 +287,26 @@ $currency_symbol = get_woocommerce_currency_symbol();
       display: none;
     }
 
+    .zc-product-customizer__range-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .zc-product-customizer__range {
+      width: 100%;
+      accent-color: #111;
+    }
+
+    .zc-product-customizer__value {
+      min-width: 58px;
+      text-align: right;
+      font-size: 13px;
+      font-weight: 800;
+      color: #111;
+    }
+
     .zc-product-customizer__clipart-grid,
     .zc-product-customizer__shape-grid,
     .zc-product-customizer__template-grid {
@@ -301,11 +325,12 @@ $currency_symbol = get_woocommerce_currency_symbol();
     }
 
     .zc-product-customizer__preview {
-      min-height: 720px;
+      min-height: 100vh;
       padding: 22px;
       display: flex;
       flex-direction: column;
       gap: 18px;
+      overflow: hidden;
     }
 
     .zc-product-customizer__safe-banner {
@@ -334,12 +359,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
       background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
       border-radius: 24px;
       padding: 24px;
-      min-height: 560px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .zc-product-customizer__canvas-stage {
       position: relative;
-      width: min(100%, 600px);
+      width: min(100%, calc(100vh - 190px), 980px);
       aspect-ratio: 1 / 1;
     }
 
@@ -422,14 +448,25 @@ $currency_symbol = get_woocommerce_currency_symbol();
         grid-template-columns: 1fr;
       }
 
+      .zc-product-customizer__panel {
+        height: auto;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
       .zc-product-customizer__preview {
-        min-height: auto;
+        min-height: 70vh;
+      }
+
+      .zc-product-customizer__canvas-stage {
+        width: min(100%, 86vh);
       }
     }
 
     @media (max-width: 640px) {
       .zc-product-customizer {
-        padding: 36px 14px;
+        padding: 0;
       }
 
       .zc-product-customizer__header,
@@ -600,6 +637,28 @@ $currency_symbol = get_woocommerce_currency_symbol();
               <span>PNG, JPG, WebP</span>
               <input type="file" accept="image/*" data-image-upload>
             </label>
+
+            <div class="zc-product-customizer__group" style="margin-top: 18px;">
+              <label class="zc-product-customizer__label" for="ZcCustomizerImageSize">Image size</label>
+              <div class="zc-product-customizer__range-row">
+                <input
+                  id="ZcCustomizerImageSize"
+                  class="zc-product-customizer__range"
+                  type="range"
+                  min="40"
+                  max="420"
+                  step="5"
+                  value="180"
+                  data-image-size
+                >
+                <span class="zc-product-customizer__value" data-image-size-label>180px</span>
+              </div>
+            </div>
+
+            <div class="zc-product-customizer__format-row">
+              <button type="button" class="zc-product-customizer__small-btn" data-image-size-step="-20">Smaller</button>
+              <button type="button" class="zc-product-customizer__small-btn" data-image-size-step="20">Larger</button>
+            </div>
           </div>
 
           <div class="zc-product-customizer__tool-panel" data-tool-panel="clipart" hidden>
@@ -711,6 +770,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
       const canvas = root.querySelector('[data-canvas]');
       const ctx = canvas.getContext('2d');
+      const imageSize = root.querySelector('[data-image-size]');
+      const imageSizeLabel = root.querySelector('[data-image-size-label]');
 
       let selectedProduct = null;
       let selectedVariant = null;
@@ -718,6 +779,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
       let isDragging = false;
       let dragOffsetX = 0;
       let dragOffsetY = 0;
+      let productPreviewImage = null;
+      let productPreviewSrc = '';
 
       const state = {
         objects: [],
@@ -739,6 +802,121 @@ $currency_symbol = get_woocommerce_currency_symbol();
       function clearNotice() {
         notice.textContent = '';
         notice.className = 'zc-product-customizer__notice';
+      }
+
+      function getTrimmedImageSource(image) {
+        const trimCanvas = document.createElement('canvas');
+        const trimCtx = trimCanvas.getContext('2d');
+
+        trimCanvas.width = image.naturalWidth;
+        trimCanvas.height = image.naturalHeight;
+        trimCtx.drawImage(image, 0, 0);
+
+        const imageData = trimCtx.getImageData(0, 0, trimCanvas.width, trimCanvas.height);
+        const data = imageData.data;
+        let minX = trimCanvas.width;
+        let minY = trimCanvas.height;
+        let maxX = 0;
+        let maxY = 0;
+        let foundPixel = false;
+
+        for (let y = 0; y < trimCanvas.height; y += 1) {
+          for (let x = 0; x < trimCanvas.width; x += 1) {
+            const index = (y * trimCanvas.width + x) * 4;
+            const red = data[index];
+            const green = data[index + 1];
+            const blue = data[index + 2];
+            const alpha = data[index + 3];
+            const isVisible = alpha > 18;
+            const isAlmostWhite = red > 245 && green > 245 && blue > 245;
+
+            if (isVisible && !isAlmostWhite) {
+              foundPixel = true;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+        }
+
+        if (!foundPixel) {
+          return {
+            src: image.src,
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          };
+        }
+
+        const padding = 4;
+        minX = Math.max(0, minX - padding);
+        minY = Math.max(0, minY - padding);
+        maxX = Math.min(trimCanvas.width - 1, maxX + padding);
+        maxY = Math.min(trimCanvas.height - 1, maxY + padding);
+
+        const cropWidth = maxX - minX + 1;
+        const cropHeight = maxY - minY + 1;
+        const croppedCanvas = document.createElement('canvas');
+        const croppedCtx = croppedCanvas.getContext('2d');
+
+        croppedCanvas.width = cropWidth;
+        croppedCanvas.height = cropHeight;
+        croppedCtx.drawImage(
+          trimCanvas,
+          minX,
+          minY,
+          cropWidth,
+          cropHeight,
+          0,
+          0,
+          cropWidth,
+          cropHeight
+        );
+
+        return {
+          src: croppedCanvas.toDataURL('image/png'),
+          width: cropWidth,
+          height: cropHeight,
+        };
+      }
+
+      function setImageControlsFromObject(object) {
+        if (!imageSize || !imageSizeLabel) return;
+
+        const sizeValue = object && object.type === 'image'
+          ? Math.round(Number(object.width) || 180)
+          : Number(imageSize.value || 180);
+
+        imageSize.value = String(Math.max(Number(imageSize.min), Math.min(Number(imageSize.max), sizeValue)));
+        imageSizeLabel.textContent = imageSize.value + 'px';
+      }
+
+      function resizeSelectedImage(size) {
+        if (!selectedObject || selectedObject.type !== 'image') {
+          showNotice('Select an uploaded image first.', 'error');
+          setImageControlsFromObject(null);
+          return;
+        }
+
+        const printableArea = getPrintableArea();
+        const aspectRatio = selectedObject.aspectRatio || 1;
+        const maxPrintableWidth = Math.min(
+          Number(imageSize.max) || 420,
+          printableArea.width,
+          printableArea.height * aspectRatio
+        );
+        const nextWidth = Math.max(
+          Number(imageSize.min) || 40,
+          Math.min(maxPrintableWidth, Number(size) || selectedObject.width || 180)
+        );
+
+        selectedObject.width = nextWidth;
+        selectedObject.height = nextWidth / aspectRatio;
+        clampObjectToPrintableArea(selectedObject);
+
+        setImageControlsFromObject(selectedObject);
+        clearNotice();
+        draw();
       }
 
       function getProductById(id) {
@@ -781,6 +959,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
           variantWrap.hidden = true;
           colorWrap.hidden = true;
           selectedVariant = null;
+          updateProductPreview();
           updatePrice();
           updateAddButton();
           return;
@@ -837,6 +1016,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         }
 
         updateSwatches();
+        updateProductPreview();
         updatePrice();
         updateAddButton();
       }
@@ -855,6 +1035,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
       function selectVariant(variantId) {
         selectedVariant = getVariantById(variantId);
         updateSwatches();
+        updateProductPreview();
         updatePrice();
         updateAddButton();
       }
@@ -1025,6 +1206,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
         state.objects.push(textObject);
         selectedObject = textObject;
+        clampObjectToPrintableArea(textObject);
 
         textInput.value = '';
         draw();
@@ -1042,19 +1224,36 @@ $currency_symbol = get_woocommerce_currency_symbol();
           const image = new Image();
 
           image.onload = () => {
-            state.objects.push({
-              id: Date.now(),
-              type: 'image',
-              src: reader.result,
-              x: 300,
-              y: 300,
-              width: 180,
-              height: 180,
-              image,
-            });
+            const trimmedImageData = getTrimmedImageSource(image);
+            const trimmedImage = new Image();
 
-            draw();
-            updatePrice();
+            trimmedImage.onload = () => {
+              const initialWidth = Number(imageSize && imageSize.value) || 180;
+              const aspectRatio = trimmedImage.naturalWidth && trimmedImage.naturalHeight
+                ? trimmedImage.naturalWidth / trimmedImage.naturalHeight
+                : 1;
+              const imageObject = {
+                id: Date.now(),
+                type: 'image',
+                src: trimmedImageData.src,
+                x: 300,
+                y: 300,
+                width: initialWidth,
+                height: initialWidth / aspectRatio,
+                aspectRatio,
+                image: trimmedImage,
+              };
+
+              state.objects.push(imageObject);
+              selectedObject = imageObject;
+              clampObjectToPrintableArea(imageObject);
+              setImageControlsFromObject(imageObject);
+
+              draw();
+              updatePrice();
+            };
+
+            trimmedImage.src = trimmedImageData.src;
           };
 
           image.src = reader.result;
@@ -1063,9 +1262,26 @@ $currency_symbol = get_woocommerce_currency_symbol();
         reader.readAsDataURL(file);
       });
 
+      if (imageSize) {
+        imageSize.addEventListener('input', () => {
+          resizeSelectedImage(imageSize.value);
+        });
+      }
+
+      root.querySelectorAll('[data-image-size-step]').forEach(button => {
+        button.addEventListener('click', () => {
+          const step = Number(button.dataset.imageSizeStep) || 0;
+          const currentSize = selectedObject && selectedObject.type === 'image'
+            ? selectedObject.width
+            : Number(imageSize && imageSize.value) || 180;
+
+          resizeSelectedImage(currentSize + step);
+        });
+      });
+
       root.querySelectorAll('[data-add-clipart]').forEach(button => {
         button.addEventListener('click', () => {
-          state.objects.push({
+          const clipartObject = {
             id: Date.now(),
             type: 'clipart',
             text: button.dataset.addClipart,
@@ -1073,7 +1289,11 @@ $currency_symbol = get_woocommerce_currency_symbol();
             y: 300,
             color: '#111111',
             fontSize: 76,
-          });
+          };
+
+          state.objects.push(clipartObject);
+          selectedObject = clipartObject;
+          clampObjectToPrintableArea(clipartObject);
 
           draw();
           updatePrice();
@@ -1082,7 +1302,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
       root.querySelectorAll('[data-add-shape]').forEach(button => {
         button.addEventListener('click', () => {
-          state.objects.push({
+          const shapeObject = {
             id: Date.now(),
             type: 'shape',
             shape: button.dataset.addShape,
@@ -1091,7 +1311,11 @@ $currency_symbol = get_woocommerce_currency_symbol();
             width: 130,
             height: 130,
             color: '#111111',
-          });
+          };
+
+          state.objects.push(shapeObject);
+          selectedObject = shapeObject;
+          clampObjectToPrintableArea(shapeObject);
 
           draw();
           updatePrice();
@@ -1169,6 +1393,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
         state.objects = state.objects.filter(object => object !== selectedObject);
         selectedObject = null;
+        setImageControlsFromObject(null);
         draw();
         updatePrice();
       });
@@ -1176,21 +1401,209 @@ $currency_symbol = get_woocommerce_currency_symbol();
       root.querySelector('[data-clear-canvas]').addEventListener('click', () => {
         state.objects = [];
         selectedObject = null;
+        setImageControlsFromObject(null);
         draw();
         updatePrice();
       });
 
+      function addRoundedRectPath(x, y, width, height, radius) {
+        const safeRadius = Math.min(radius, width / 2, height / 2);
+
+        ctx.moveTo(x + safeRadius, y);
+        ctx.lineTo(x + width - safeRadius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+        ctx.lineTo(x + width, y + height - safeRadius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+        ctx.lineTo(x + safeRadius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+        ctx.lineTo(x, y + safeRadius);
+        ctx.quadraticCurveTo(x, y, x + safeRadius, y);
+      }
+
       function drawSafeArea() {
         ctx.save();
 
-        ctx.beginPath();
-        ctx.arc(300, 300, 255, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(218, 0, 4, 0.5)';
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(300, 300, 255, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.restore();
+      }
+
+      function getProductPreviewSrc() {
+        if (selectedVariant && selectedVariant.image) {
+          return selectedVariant.image;
+        }
+
+        if (selectedProduct && selectedProduct.image) {
+          return selectedProduct.image;
+        }
+
+        return '';
+      }
+
+      function getProductPreviewLabel() {
+        return [
+          selectedProduct ? selectedProduct.title : '',
+          selectedVariant ? selectedVariant.title : '',
+        ].join(' ').toLowerCase();
+      }
+
+      function getPrintableArea() {
+        return { x: 45, y: 45, width: 510, height: 510 };
+      }
+
+      function clampObjectToPrintableArea(object) {
+        const bounds = getObjectBounds(object);
+        const area = getPrintableArea();
+
+        if (!bounds) return;
+
+        if (bounds.width > area.width) {
+          object.x = area.x + area.width / 2;
+        } else if (bounds.x < area.x) {
+          object.x += area.x - bounds.x;
+        } else if (bounds.x + bounds.width > area.x + area.width) {
+          object.x -= (bounds.x + bounds.width) - (area.x + area.width);
+        }
+
+        const nextBounds = getObjectBounds(object);
+        if (!nextBounds) return;
+
+        if (nextBounds.height > area.height) {
+          object.y = area.y + area.height / 2;
+        } else if (nextBounds.y < area.y) {
+          object.y += area.y - nextBounds.y;
+        } else if (nextBounds.y + nextBounds.height > area.y + area.height) {
+          object.y -= (nextBounds.y + nextBounds.height) - (area.y + area.height);
+        }
+      }
+
+      function updateProductPreview() {
+        const nextSrc = getProductPreviewSrc();
+
+        if (!nextSrc) {
+          productPreviewImage = null;
+          productPreviewSrc = '';
+          draw();
+          return;
+        }
+
+        if (nextSrc === productPreviewSrc && productPreviewImage) {
+          draw();
+          return;
+        }
+
+        productPreviewSrc = nextSrc;
+        productPreviewImage = new Image();
+        productPreviewImage.crossOrigin = 'anonymous';
+        productPreviewImage.onload = draw;
+        productPreviewImage.onerror = () => {
+          productPreviewImage = null;
+          draw();
+        };
+        productPreviewImage.src = nextSrc;
+      }
+
+      function drawImageContain(image, x, y, width, height) {
+        const ratio = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+        const drawWidth = image.naturalWidth * ratio;
+        const drawHeight = image.naturalHeight * ratio;
+
+        ctx.drawImage(
+          image,
+          x + (width - drawWidth) / 2,
+          y + (height - drawHeight) / 2,
+          drawWidth,
+          drawHeight
+        );
+      }
+
+      function drawTshirtFallback() {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.16)';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(205, 130);
+        ctx.lineTo(255, 105);
+        ctx.quadraticCurveTo(300, 140, 345, 105);
+        ctx.lineTo(395, 130);
+        ctx.lineTo(470, 220);
+        ctx.lineTo(415, 270);
+        ctx.lineTo(375, 235);
+        ctx.lineTo(375, 495);
+        ctx.lineTo(225, 495);
+        ctx.lineTo(225, 235);
+        ctx.lineTo(185, 270);
+        ctx.lineTo(130, 220);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawAirpodsFallback() {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.16)';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        addRoundedRectPath(180, 250, 240, 160, 46);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(180, 305);
+        ctx.lineTo(420, 305);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(300, 338, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#f2f2f2';
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawDefaultProductFallback() {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.16)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        addRoundedRectPath(160, 140, 280, 360, 26);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawProductBase() {
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(300, 300, 298, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function clipToPrintableArea() {
+        const printableArea = getPrintableArea();
+
+        ctx.beginPath();
+        addRoundedRectPath(
+          printableArea.x,
+          printableArea.y,
+          printableArea.width,
+          printableArea.height,
+          18
+        );
+        ctx.clip();
       }
 
       function drawSelection(object) {
@@ -1262,9 +1675,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         });
       }
 
-      function drawObject(object) {
-        ctx.save();
-
+      function drawRawObject(object) {
         if (object.type === 'text' || object.type === 'clipart') {
           drawTextLikeObject(object);
         }
@@ -1306,9 +1717,50 @@ $currency_symbol = get_woocommerce_currency_symbol();
             ctx.fill();
           }
         }
+      }
+
+      function drawPrintedObject(object) {
+        ctx.save();
+        clipToPrintableArea();
+        ctx.globalAlpha = object.type === 'image' ? 1 : 0.96;
+        ctx.globalCompositeOperation = object.type === 'image' ? 'source-over' : 'multiply';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+        ctx.shadowBlur = 0.8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0.8;
+        drawRawObject(object);
+        ctx.restore();
+      }
+
+      function drawFabricTextureOverDesign(object) {
+        const bounds = getObjectBounds(object);
+        if (!bounds) return;
+
+        ctx.save();
+        clipToPrintableArea();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.12;
+        ctx.strokeStyle = '#6f604d';
+        ctx.lineWidth = 0.7;
+
+        const startX = Math.max(getPrintableArea().x, bounds.x) - 20;
+        const endX = Math.min(getPrintableArea().x + getPrintableArea().width, bounds.x + bounds.width) + 20;
+        const startY = Math.max(getPrintableArea().y, bounds.y) - 20;
+        const endY = Math.min(getPrintableArea().y + getPrintableArea().height, bounds.y + bounds.height) + 20;
+
+        for (let x = startX; x <= endX; x += 5) {
+          ctx.beginPath();
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x + 28, endY);
+          ctx.stroke();
+        }
 
         ctx.restore();
+      }
 
+      function drawObject(object) {
+        drawPrintedObject(object);
+        drawFabricTextureOverDesign(object);
         drawSelection(object);
       }
 
@@ -1316,12 +1768,11 @@ $currency_symbol = get_woocommerce_currency_symbol();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(300, 300, 298, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = '#f8f8f8';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
 
+        drawProductBase();
         drawSafeArea();
 
         state.objects.forEach(drawObject);
@@ -1395,6 +1846,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
       canvas.addEventListener('mousedown', event => {
         const point = getCanvasPoint(event);
         selectedObject = hitTest(point);
+        setImageControlsFromObject(selectedObject);
 
         if (selectedObject) {
           isDragging = true;
@@ -1412,6 +1864,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
         selectedObject.x = point.x - dragOffsetX;
         selectedObject.y = point.y - dragOffsetY;
+        clampObjectToPrintableArea(selectedObject);
 
         draw();
       });
@@ -1426,6 +1879,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
         const point = getCanvasPoint(touch);
         selectedObject = hitTest(point);
+        setImageControlsFromObject(selectedObject);
 
         if (selectedObject) {
           isDragging = true;
@@ -1444,6 +1898,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
         selectedObject.x = point.x - dragOffsetX;
         selectedObject.y = point.y - dragOffsetY;
+        clampObjectToPrintableArea(selectedObject);
 
         draw();
       }, { passive: true });
@@ -1462,6 +1917,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
           state.objects = state.objects.filter(object => object !== selectedObject);
           selectedObject = null;
+          setImageControlsFromObject(null);
           draw();
           updatePrice();
         }
