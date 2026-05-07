@@ -61,24 +61,177 @@ function zarvel_get_shop_categories($limit = 0) {
 /**
  * Shipping rule:
  * - United States: free shipping.
- * - Outside United States: do not override Printful/WooCommerce live shipping rates.
+ * - Outside United States: keep Printful/WooCommerce live shipping rates.
+ * - If no non-US rate is returned, add a fallback estimate so checkout never
+ *   completes with accidental zero shipping.
  */
-function zarvel_is_us_shipping_destination($package) {
-    $country = '';
+if (!defined('ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK')) {
+    define('ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK', 299);
+}
 
-    if (!empty($package['destination']['country'])) {
-        $country = $package['destination']['country'];
-    } elseif (function_exists('WC') && WC()->customer) {
-        $country = WC()->customer->get_shipping_country() ?: WC()->customer->get_billing_country();
-    }
+function zarvel_is_us_shipping_destination($package) {
+    $country = zarvel_get_package_destination_country($package);
 
     return strtoupper((string) $country) === 'US';
 }
+
+function zarvel_get_package_destination_country($package) {
+    if (!empty($package['destination']['country'])) {
+        return strtoupper((string) $package['destination']['country']);
+    }
+
+    return zarvel_get_customer_shipping_country();
+}
+
+function zarvel_get_customer_shipping_country() {
+    if (!function_exists('WC') || !WC()->customer) {
+        return '';
+    }
+
+    return strtoupper((string) (WC()->customer->get_shipping_country() ?: WC()->customer->get_billing_country()));
+}
+
+function zarvel_get_cart_shipping_label() {
+    if (!function_exists('WC') || !WC()->cart || WC()->cart->is_empty()) {
+        return '&mdash;';
+    }
+
+    if (!WC()->cart->needs_shipping()) {
+        return __('No shipping required', 'zarvel-creative');
+    }
+
+    $shipping_total = (float) WC()->cart->get_shipping_total() + (float) WC()->cart->get_shipping_tax();
+    $country = zarvel_get_customer_shipping_country();
+
+    if ($country === 'US') {
+        return __('FREE', 'zarvel-creative');
+    }
+
+    if ($shipping_total > 0) {
+        return function_exists('wc_price') ? wc_price($shipping_total) : number_format($shipping_total, 2);
+    }
+
+    return __('Calculated at checkout', 'zarvel-creative');
+}
+
+function zarvel_get_cart_total_html() {
+    if (!function_exists('WC') || !WC()->cart) {
+        return function_exists('wc_price') ? wc_price(0) : '$0.00';
+    }
+
+    $cart_total = (float) WC()->cart->get_total('edit');
+
+    return function_exists('wc_price') ? wc_price($cart_total) : '$' . number_format($cart_total, 2);
+}
+
+function zarvel_refresh_cart_totals() {
+    if (!function_exists('WC') || !WC()->cart || WC()->cart->is_empty()) {
+        return;
+    }
+
+    WC()->cart->calculate_shipping();
+    WC()->cart->calculate_totals();
+}
+
+add_action('woocommerce_shipping_init', function () {
+    if (!class_exists('WC_Shipping_Method') || class_exists('Zarvel_Theme_Shipping_Method')) {
+        return;
+    }
+
+    class Zarvel_Theme_Shipping_Method extends WC_Shipping_Method {
+        public function __construct($instance_id = 0) {
+            $this->id = 'zarvel_theme_shipping';
+            $this->instance_id = absint($instance_id);
+            $this->method_title = __('Zarvel Theme Shipping', 'zarvel-creative');
+            $this->method_description = __('Keeps WooCommerce shipping calculations active for theme-defined rates.', 'zarvel-creative');
+            $this->enabled = 'yes';
+            $this->title = __('Zarvel Shipping', 'zarvel-creative');
+        }
+
+        public function calculate_shipping($package = array()) {
+            return;
+        }
+    }
+});
+
+add_filter('woocommerce_shipping_methods', function ($methods) {
+    $methods['zarvel_theme_shipping'] = 'Zarvel_Theme_Shipping_Method';
+    delete_transient('wc_shipping_method_count');
+
+    return $methods;
+});
+
+add_filter('pre_transient_wc_shipping_method_count', function ($pre) {
+    if (!class_exists('WC_Cache_Helper')) {
+        return $pre;
+    }
+
+    return array(
+        'version'  => WC_Cache_Helper::get_transient_version('shipping'),
+        'legacy'   => 1,
+        'enabled'  => 1,
+        'disabled' => 0,
+    );
+});
+
+add_filter('woocommerce_product_needs_shipping', function ($needs_shipping, $product) {
+    if (
+        is_object($product) &&
+        method_exists($product, 'get_type') &&
+        in_array($product->get_type(), array('simple', 'variable', 'variation'), true)
+    ) {
+        return true;
+    }
+
+    return $needs_shipping;
+}, 20, 2);
+
+add_filter('woocommerce_cart_needs_shipping', function ($needs_shipping) {
+    if (function_exists('WC') && WC()->cart && !WC()->cart->is_empty()) {
+        return true;
+    }
+
+    return $needs_shipping;
+}, 20);
+
+add_filter('woocommerce_cart_shipping_packages', function ($packages) {
+    if (!empty($packages) || !function_exists('WC') || !WC()->cart || WC()->cart->is_empty()) {
+        return $packages;
+    }
+
+    $cart_contents = WC()->cart->get_cart();
+
+    if (empty($cart_contents)) {
+        return $packages;
+    }
+
+    return array(
+        array(
+            'contents'        => $cart_contents,
+            'contents_cost'   => WC()->cart->get_subtotal(),
+            'applied_coupons' => WC()->cart->get_applied_coupons(),
+            'user'            => array(
+                'ID' => get_current_user_id(),
+            ),
+            'destination'     => array(
+                'country'   => WC()->customer ? WC()->customer->get_shipping_country() ?: WC()->customer->get_billing_country() : '',
+                'state'     => WC()->customer ? WC()->customer->get_shipping_state() ?: WC()->customer->get_billing_state() : '',
+                'postcode'  => WC()->customer ? WC()->customer->get_shipping_postcode() ?: WC()->customer->get_billing_postcode() : '',
+                'city'      => WC()->customer ? WC()->customer->get_shipping_city() ?: WC()->customer->get_billing_city() : '',
+                'address'   => WC()->customer ? WC()->customer->get_shipping_address_1() ?: WC()->customer->get_billing_address_1() : '',
+                'address_1' => WC()->customer ? WC()->customer->get_shipping_address_1() ?: WC()->customer->get_billing_address_1() : '',
+                'address_2' => WC()->customer ? WC()->customer->get_shipping_address_2() ?: WC()->customer->get_billing_address_2() : '',
+            ),
+        ),
+    );
+}, 20);
 
 add_filter('woocommerce_package_rates', function ($rates, $package) {
     if (!is_array($rates)) {
         return $rates;
     }
+
+    $destination_country = zarvel_get_package_destination_country($package);
 
     if (zarvel_is_us_shipping_destination($package)) {
         $free_rate_id = 'zarvel_free_us_shipping';
@@ -104,8 +257,57 @@ add_filter('woocommerce_package_rates', function ($rates, $package) {
         }
     }
 
+    if (!$destination_country) {
+        return $rates;
+    }
+
+    $has_paid_shipping_rate = false;
+
+    foreach ($rates as $rate) {
+        if (is_object($rate) && method_exists($rate, 'get_cost') && (float) $rate->get_cost() > 0) {
+            $has_paid_shipping_rate = true;
+            break;
+        }
+    }
+
+    if (!$has_paid_shipping_rate) {
+        $fallback_rate_id = 'zarvel_international_printful_estimate';
+        $rates[$fallback_rate_id] = new WC_Shipping_Rate(
+            $fallback_rate_id,
+            __('International Shipping (Printful estimate)', 'zarvel-creative'),
+            (float) ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK,
+            array(),
+            'zarvel_international_printful_estimate'
+        );
+    }
+
     return $rates;
 }, 100, 2);
+
+add_action('woocommerce_checkout_process', function () {
+    if (!function_exists('WC') || !WC()->cart || !WC()->cart->needs_shipping()) {
+        return;
+    }
+
+    $country = '';
+
+    if (!empty($_POST['ship_to_different_address']) && !empty($_POST['shipping_country'])) {
+        $country = sanitize_text_field(wp_unslash($_POST['shipping_country']));
+    } elseif (!empty($_POST['billing_country'])) {
+        $country = sanitize_text_field(wp_unslash($_POST['billing_country']));
+    } else {
+        $country = zarvel_get_customer_shipping_country();
+    }
+
+    $country = strtoupper((string) $country);
+
+    if ($country && $country !== 'US' && (float) WC()->cart->get_shipping_total() <= 0) {
+        wc_add_notice(
+            __('International shipping must be calculated before placing your order. Please review your address and shipping method.', 'zarvel-creative'),
+            'error'
+        );
+    }
+});
 
 /**
  * Side cart quantity controls.

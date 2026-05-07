@@ -5,13 +5,21 @@ get_header();
 
 $cart_count = 0;
 $cart_subtotal = 0;
+$cart_shipping_label = '&mdash;';
+$cart_total_html = function_exists('wc_price') ? wc_price(0) : '$0.00';
 $cart_items = array();
 $checkout_ready = function_exists('WC') && WC()->cart && !WC()->cart->is_empty();
 
 if (function_exists('WC') && WC()->cart) {
+    if (function_exists('zarvel_refresh_cart_totals')) {
+        zarvel_refresh_cart_totals();
+    }
+
     $cart_count = WC()->cart->get_cart_contents_count();
     $cart_subtotal = (float) WC()->cart->get_subtotal();
     $cart_items = WC()->cart->get_cart();
+    $cart_shipping_label = function_exists('zarvel_get_cart_shipping_label') ? zarvel_get_cart_shipping_label() : $cart_shipping_label;
+    $cart_total_html = function_exists('zarvel_get_cart_total_html') ? zarvel_get_cart_total_html() : $cart_total_html;
 }
 ?>
 
@@ -84,12 +92,12 @@ if (function_exists('WC') && WC()->cart) {
           </div>
           <div>
             <span>Shipping</span>
-            <strong>US free / International calculated</strong>
+            <strong><?php echo wp_kses_post($cart_shipping_label); ?></strong>
           </div>
           <hr>
           <div class="zc-checkout-total__final">
             <span>Total</span>
-            <strong><?php echo wp_kses_post(function_exists('wc_price') ? wc_price($cart_subtotal) : '$' . number_format($cart_subtotal, 2)); ?></strong>
+            <strong><?php echo wp_kses_post($cart_total_html); ?></strong>
           </div>
         </div>
 

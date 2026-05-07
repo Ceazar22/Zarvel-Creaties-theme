@@ -169,14 +169,22 @@
 <?php
 $zc_cart_count = 0;
 $zc_cart_subtotal = 0;
+$zc_cart_shipping_label = '&mdash;';
+$zc_cart_total_html = function_exists('wc_price') ? wc_price(0) : '$0.00';
 $zc_cart_items = array();
 $zc_cart_url = function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart');
 $zc_checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout');
 
 if (function_exists('WC') && WC()->cart) {
+  if (function_exists('zarvel_refresh_cart_totals')) {
+    zarvel_refresh_cart_totals();
+  }
+
   $zc_cart_count = WC()->cart->get_cart_contents_count();
   $zc_cart_subtotal = (float) WC()->cart->get_subtotal();
   $zc_cart_items = WC()->cart->get_cart();
+  $zc_cart_shipping_label = function_exists('zarvel_get_cart_shipping_label') ? zarvel_get_cart_shipping_label() : $zc_cart_shipping_label;
+  $zc_cart_total_html = function_exists('zarvel_get_cart_total_html') ? zarvel_get_cart_total_html() : $zc_cart_total_html;
 }
 
 $zc_cart_subtotal_html = function_exists('wc_price')
@@ -344,12 +352,12 @@ $zc_cart_subtotal_html = function_exists('wc_price')
       </div>
       <div>
         <span>Shipping</span>
-        <strong class="zc-sidecart__free">US free / Intl calculated</strong>
+        <strong class="zc-sidecart__free"><?php echo wp_kses_post($zc_cart_shipping_label); ?></strong>
       </div>
       <hr>
       <div class="zc-sidecart__total">
         <span>Total</span>
-        <strong><?php echo wp_kses_post($zc_cart_subtotal_html); ?></strong>
+        <strong><?php echo wp_kses_post($zc_cart_total_html); ?></strong>
       </div>
 
       <a class="zc-sidecart__view-cart" href="<?php echo esc_url($zc_cart_url); ?>">View Cart</a>
