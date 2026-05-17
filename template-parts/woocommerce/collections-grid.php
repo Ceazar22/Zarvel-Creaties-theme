@@ -175,7 +175,7 @@ $zc_showing_end = min($zc_offset + $zc_per_page, $zc_total_categories);
         </p>
 
         <a href="<?php echo esc_url($zc_customize_url); ?>">
-          Create Your Design
+          Fill Out Form
           <span>+</span>
         </a>
       </div>

@@ -19,7 +19,7 @@
         </a>
 
         <a href="<?php echo esc_url(home_url('/customize')); ?>" class="zc-hero-btn zc-hero-btn--black">
-          CREATE YOUR DESIGN
+          FILL OUT DESIGN FORM
           <span>→</span>
         </a>
       </div>

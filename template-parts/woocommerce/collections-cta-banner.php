@@ -17,7 +17,7 @@ $zc_customize_url = home_url('/customize/');
       </div>
 
       <a href="<?php echo esc_url($zc_customize_url); ?>" class="zc-collections-idea-banner__button">
-        Create Your Custom Print
+        Fill Out Design Form
         <span>→</span>
       </a>
     </div>

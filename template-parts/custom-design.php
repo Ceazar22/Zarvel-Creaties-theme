@@ -12,7 +12,7 @@
         </p>
 
         <a href="<?php echo esc_url(home_url('/customize')); ?>" class="zc-custom-design-btn">
-          START CUSTOM ORDER
+          FILL OUT DESIGN FORM
           <span>→</span>
         </a>
       </div>
@@ -28,7 +28,7 @@
 
         <div class="zc-custom-upload-text">
           <h3>Send us your logo</h3>
-          <p>We’ll place it on your product and prepare the mockup for you.</p>
+          <p>Tell us the product, placement, colors, and artwork you want.</p>
         </div>
       </div>
 

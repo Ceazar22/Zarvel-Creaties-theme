@@ -7,7 +7,7 @@ defined('ABSPATH') || exit;
 
     <div class="zc-customize-step zc-customize-step--form">
       <h2 class="zc-customize-step__title">
-        Submit Your Design Request
+        Fill Out Your Design Form
       </h2>
 
       <?php
@@ -18,7 +18,7 @@ defined('ABSPATH') || exit;
 
       <?php if ($request_status === 'success') : ?>
         <div class="zc-form-message zc-form-message--success">
-          Your design request was sent successfully. We’ll get back to you soon.
+          Your design form was sent successfully. We’ll get back to you soon.
         </div>
       <?php elseif ($request_status === 'failed') : ?>
         <div class="zc-form-message zc-form-message--error">
@@ -104,6 +104,19 @@ defined('ABSPATH') || exit;
             </div>
 
             <div class="zc-form-field">
+              <label for="zc_print_location">Print Placement <span>*</span></label>
+              <select id="zc_print_location" name="print_location" required>
+                <option value="">Select print placement</option>
+                <option value="front">Front</option>
+                <option value="back">Back</option>
+                <option value="front-and-back">Front and Back</option>
+                <option value="left-chest">Left Chest</option>
+                <option value="sleeve">Sleeve</option>
+                <option value="other">Other / Not Sure</option>
+              </select>
+            </div>
+
+            <div class="zc-form-field">
               <label>What are we working with? <span>*</span></label>
 
               <div class="zc-logo-option-grid">
@@ -159,6 +172,16 @@ defined('ABSPATH') || exit;
             </div>
 
             <div class="zc-form-field">
+              <label for="zc_design_text">Text To Include</label>
+              <input id="zc_design_text" type="text" name="design_text" placeholder="Enter the exact words, names, or slogan for the design">
+            </div>
+
+            <div class="zc-form-field">
+              <label for="zc_preferred_colors">Preferred Colors</label>
+              <input id="zc_preferred_colors" type="text" name="preferred_colors" placeholder="Example: black shirt, white print, orange accent">
+            </div>
+
+            <div class="zc-form-field">
               <label for="zc_design_notes">Design Instructions <span>*</span></label>
               <textarea id="zc_design_notes" name="design_notes" rows="7" placeholder="Tell us about your design idea, placement, colors, text, style, or anything important..." required></textarea>
             </div>
@@ -169,7 +192,7 @@ defined('ABSPATH') || exit;
 
         <div class="zc-design-request-form__footer">
           <button type="submit" class="zc-design-request-form__submit">
-            Send Design Request
+            Submit Design Form
           </button>
 
           <p>

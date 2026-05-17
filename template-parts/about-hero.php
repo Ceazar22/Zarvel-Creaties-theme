@@ -15,6 +15,7 @@ $contact_url  = home_url('/contact/');
     </nav>
 
     <div class="zc-about-hero__content">
+<<<<<<< HEAD
       <span class="zc-about-hero__kicker">Our Story</span>
 
       <h1 class="zc-about-hero__title">
@@ -37,6 +38,30 @@ $contact_url  = home_url('/contact/');
           <span>→</span>
         </a>
       </div>
+=======
+      <span class="zc-about-hero__kicker">Our Story</span>
+
+      <h1 class="zc-about-hero__title">
+        We’re Here To Help<br>
+        You Wear Your Story.
+      </h1>
+
+      <p class="zc-about-hero__text">
+        Printly was built for creators, dreamers, and doers who want more than just ordinary.
+        We turn ideas into high-quality prints you’ll love.
+      </p>
+
+      <div class="zc-about-hero__buttons">
+        <a href="<?php echo esc_url($customize_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--orange">
+          Fill Out Design Form
+        </a>
+
+        <a href="<?php echo esc_url($shop_url); ?>" class="zc-about-hero__btn zc-about-hero__btn--dark">
+          Shop Products
+          <span>→</span>
+        </a>
+      </div>
+>>>>>>> 62080e5 (Updated Single Page Product)
     </div>
 
   </div>

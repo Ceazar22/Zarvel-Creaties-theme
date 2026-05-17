@@ -8,18 +8,18 @@ defined('ABSPATH') || exit;
     <nav class="zc-customize-hero__breadcrumb" aria-label="Breadcrumb">
       <a href="<?php echo esc_url(home_url('/')); ?>">Home</a>
       <span>›</span>
-      <strong>Customize</strong>
+      <strong>Design Form</strong>
     </nav>
 
     <div class="zc-customize-hero__content">
       <h1 class="zc-customize-hero__title">
-        <span>Customize</span>
-        <strong>Your Own Print</strong>
+        <span>Tell Us</span>
+        <strong>Your Design</strong>
       </h1>
 
       <p class="zc-customize-hero__text">
-        Send us your logo, artwork, or idea and we’ll turn it into a print-ready design
-        for t-shirts, hoodies, mugs, and more.
+        Fill out the form with your product, artwork, colors, placement, and design notes
+        so we can prepare exactly what you have in mind.
       </p>
     </div>
 

@@ -2,7 +2,7 @@
 defined('ABSPATH') || exit;
 
 /**
- * Handle Customize Design Request Form
+ * Handle Design Details Form
  */
 function zarvel_handle_customize_form() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -60,6 +60,8 @@ function zarvel_handle_customize_form() {
     $full_name    = isset($_POST['full_name']) ? sanitize_text_field(wp_unslash($_POST['full_name'])) : '';
     $email        = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
     $phone        = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+    $design_text  = isset($_POST['design_text']) ? sanitize_text_field(wp_unslash($_POST['design_text'])) : '';
+    $preferred_colors = isset($_POST['preferred_colors']) ? sanitize_text_field(wp_unslash($_POST['preferred_colors'])) : '';
     $design_notes = isset($_POST['design_notes']) ? sanitize_textarea_field(wp_unslash($_POST['design_notes'])) : '';
 
     /**
@@ -87,6 +89,27 @@ function zarvel_handle_customize_form() {
 
     if (isset($product_aliases[$product_type])) {
         $product_type = $product_aliases[$product_type];
+    }
+
+    $raw_print_location = isset($_POST['print_location'])
+        ? sanitize_text_field(wp_unslash($_POST['print_location']))
+        : '';
+
+    $print_location = sanitize_title($raw_print_location);
+
+    $print_location_aliases = array(
+        'front'          => 'front',
+        'back'           => 'back',
+        'front-back'     => 'front-and-back',
+        'front-and-back' => 'front-and-back',
+        'left-chest'     => 'left-chest',
+        'sleeve'         => 'sleeve',
+        'other'          => 'other',
+        'not-sure'       => 'other',
+    );
+
+    if (isset($print_location_aliases[$print_location])) {
+        $print_location = $print_location_aliases[$print_location];
     }
 
     /**
@@ -120,6 +143,7 @@ function zarvel_handle_customize_form() {
         empty($full_name) ||
         empty($email) ||
         empty($product_type) ||
+        empty($print_location) ||
         empty($logo_status) ||
         empty($design_notes)
     ) {
@@ -148,6 +172,20 @@ function zarvel_handle_customize_form() {
 
     if (!in_array($product_type, $allowed_product_types, true)) {
         wp_safe_redirect(add_query_arg('request_status', 'invalid_product', $redirect_url));
+        exit;
+    }
+
+    $allowed_print_locations = array(
+        'front',
+        'back',
+        'front-and-back',
+        'left-chest',
+        'sleeve',
+        'other',
+    );
+
+    if (!in_array($print_location, $allowed_print_locations, true)) {
+        wp_safe_redirect(add_query_arg('request_status', 'missing_fields', $redirect_url));
         exit;
     }
 
@@ -182,17 +220,27 @@ function zarvel_handle_customize_form() {
         'has-idea-only' => 'Customer has an idea only and needs help turning it into a design.',
     );
 
+    $print_location_labels = array(
+        'front'          => 'Front',
+        'back'           => 'Back',
+        'front-and-back' => 'Front and Back',
+        'left-chest'     => 'Left Chest',
+        'sleeve'         => 'Sleeve',
+        'other'          => 'Other / Not Sure',
+    );
+
     $product_type_label = $product_type_labels[$product_type];
     $logo_status_label  = $logo_status_labels[$logo_status];
+    $print_location_label = $print_location_labels[$print_location];
 
     /**
      * Email setup.
      */
     $recipient = 'bryanceazartabanas@gmail.com';
-    $subject   = 'New Custom Design Request - ' . $full_name;
+    $subject   = 'New Design Form Submission - ' . $full_name;
 
-    $message  = "New custom design request\n";
-    $message .= "=========================\n\n";
+    $message  = "New design form submission\n";
+    $message .= "==========================\n\n";
 
     $message .= "Customer Details\n";
     $message .= "----------------\n";
@@ -203,7 +251,13 @@ function zarvel_handle_customize_form() {
     $message .= "Product Request\n";
     $message .= "---------------\n";
     $message .= "Product Type: {$product_type_label}\n";
+    $message .= "Print Placement: {$print_location_label}\n";
     $message .= "Logo / Design Status: {$logo_status_label}\n\n";
+
+    $message .= "Design Details\n";
+    $message .= "--------------\n";
+    $message .= "Text To Include: {$design_text}\n";
+    $message .= "Preferred Colors: {$preferred_colors}\n\n";
 
     $message .= "Design Instructions\n";
     $message .= "-------------------\n";

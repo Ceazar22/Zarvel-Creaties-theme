@@ -56,6 +56,7 @@
             <svg class="zc-chevron" viewBox="0 0 24 24" width="13" height="13">
               <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
+<<<<<<< HEAD
           </a>
 
           <div class="zc-dropdown">
@@ -81,6 +82,20 @@
         </div>
 
         <a href="<?php echo esc_url(home_url('/our-services')); ?>" class="zc-nav-link">OUR SERVICES</a>
+=======
+          </a>
+
+          <div class="zc-dropdown">
+            <a href="<?php echo esc_url(home_url('/product-category/t-shirts')); ?>">T-Shirts</a>
+            <a href="<?php echo esc_url(home_url('/product-category/hoodies')); ?>">Hoodies</a>
+            <a href="<?php echo esc_url(home_url('/product-category/mugs')); ?>">Mugs</a>
+            <a href="<?php echo esc_url(home_url('/product-category/tote-bags')); ?>">Tote Bags</a>
+            <a href="<?php echo esc_url(home_url('/shop')); ?>">All Products</a>
+          </div>
+        </div>
+
+        <a href="<?php echo esc_url(home_url('/customize')); ?>" class="zc-nav-link">DESIGN FORM</a>
+>>>>>>> 62080e5 (Updated Single Page Product)
         <a href="<?php echo esc_url(home_url('/about-us')); ?>" class="zc-nav-link">ABOUT</a>
         <a href="<?php echo esc_url(home_url('/contact')); ?>" class="zc-nav-link">CONTACT</a>
 
@@ -122,7 +137,7 @@
         </a>
 
         <a href="<?php echo esc_url(home_url('/customize')); ?>" class="zc-customize-btn">
-          START CUSTOMIZING
+          FILL OUT FORM
         </a>
 
       </div>
@@ -1498,6 +1513,7 @@ body.admin-bar .zc-header {
     opacity: 0;
   }
 
+<<<<<<< HEAD
   .zc-mobile-toggle.is-active span:nth-child(3) {
     transform: translateY(-9px) rotate(-45deg);
   }
@@ -1584,4 +1600,10 @@ body.admin-bar .zc-header {
     width: 100%;
   }
 }
+=======
+  .zc-mobile-toggle.is-active span:nth-child(3) {
+    transform: translateY(-9px) rotate(-45deg);
+  }
+}
+>>>>>>> 62080e5 (Updated Single Page Product)
 </style>
