@@ -307,10 +307,10 @@ $average_rating = $product->get_average_rating();
 $review_count   = $product->get_review_count();
 
 $button_text_filter = function () {
-  return 'SEND DESIGN REQUEST';
+  return 'FILL OUT DESIGN FORM';
 };
 
-$zc_customizer_url = home_url('/page-design-studio/');
+$zc_design_form_url = home_url('/customize/');
 ?>
 
 <section class="zc-product-section">
@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const variationGalleryMap = <?php echo wp_json_encode($zc_color_gallery_map); ?>;
   const defaultGallery = <?php echo wp_json_encode($initial_gallery_images); ?>;
-  const zcCustomizerUrl = <?php echo wp_json_encode($zc_customizer_url); ?>;
+  const zcDesignFormUrl = <?php echo wp_json_encode($zc_design_form_url); ?>;
   const zcCurrentProductId = <?php echo wp_json_encode($product->get_id()); ?>;
 
   function normalizeColorName(colorName) {
@@ -705,9 +705,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   initZcQuantityAndButtons();
-  initZcSendDesignRequestToCustomizer();
+  initZcSendDesignRequestToForm();
 
-  function initZcSendDesignRequestToCustomizer() {
+  function initZcSendDesignRequestToForm() {
     const formArea = document.querySelector('[data-zc-product-form-area]');
 
     if (!formArea) return;
@@ -756,11 +756,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return missing;
     }
 
-    function buildCustomizerUrl(form) {
+    function buildDesignFormUrl(form) {
       const productId = getProductIdFromForm(form);
       const variationId = getVariationIdFromForm(form);
       const quantity = getQuantityFromForm(form);
-      const url = new URL(zcCustomizerUrl, window.location.origin);
+      const url = new URL(zcDesignFormUrl, window.location.origin);
 
       url.searchParams.set('zc_product_id', productId);
       url.searchParams.set('quantity', quantity);
@@ -777,7 +777,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return url.toString();
     }
 
-    function redirectToCustomizer(form) {
+    function redirectToDesignForm(form) {
       if (!form) return;
 
       const isVariableForm = form.classList.contains('variations_form');
@@ -793,7 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      window.location.href = buildCustomizerUrl(form);
+      window.location.href = buildDesignFormUrl(form);
     }
 
     keepDesignRequestButtonsClickable();
@@ -811,7 +811,7 @@ document.addEventListener('DOMContentLoaded', function () {
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      redirectToCustomizer(form);
+      redirectToDesignForm(form);
     }, true);
 
     formArea.addEventListener('submit', function (event) {
@@ -823,7 +823,7 @@ document.addEventListener('DOMContentLoaded', function () {
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      redirectToCustomizer(form);
+      redirectToDesignForm(form);
     }, true);
 
     if (window.jQuery) {
