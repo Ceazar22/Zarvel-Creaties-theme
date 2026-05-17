@@ -14,6 +14,33 @@ defined('ABSPATH') || exit;
       $request_status = isset($_GET['request_status'])
         ? sanitize_text_field(wp_unslash($_GET['request_status']))
         : '';
+
+      $selected_product_id = isset($_GET['zc_product_id']) ? absint($_GET['zc_product_id']) : 0;
+      $selected_product_name = '';
+      $selected_product_type = '';
+
+      if ($selected_product_id && function_exists('wc_get_product')) {
+        $selected_product = wc_get_product($selected_product_id);
+
+        if ($selected_product) {
+          $selected_product_name = $selected_product->get_name();
+          $selected_product_key = sanitize_title($selected_product_name);
+
+          if (strpos($selected_product_key, 'airpod') !== false) {
+            $selected_product_type = 'airpods';
+          } elseif (strpos($selected_product_key, 'cap') !== false) {
+            $selected_product_type = 'cap';
+          } elseif (strpos($selected_product_key, 'sweatshirt') !== false || strpos($selected_product_key, 'sweater') !== false) {
+            $selected_product_type = 'sweatshirt';
+          } elseif (strpos($selected_product_key, 'hoodie') !== false) {
+            $selected_product_type = 'hoodie';
+          } elseif (strpos($selected_product_key, 'mug') !== false) {
+            $selected_product_type = 'mug';
+          } elseif (strpos($selected_product_key, 't-shirt') !== false || strpos($selected_product_key, 'shirt') !== false) {
+            $selected_product_type = 't-shirt';
+          }
+        }
+      }
       ?>
 
       <?php if ($request_status === 'success') : ?>
@@ -66,6 +93,7 @@ defined('ABSPATH') || exit;
         <?php wp_nonce_field('zarvel_customize_form_action', 'zarvel_customize_nonce'); ?>
 
         <input type="hidden" name="zarvel_customize_form_submit" value="1">
+        <input type="hidden" name="zc_product_id" value="<?php echo esc_attr($selected_product_id); ?>">
 
         <div style="position:absolute; left:-9999px; opacity:0; pointer-events:none;">
           <label for="website_url">Website</label>
@@ -91,15 +119,26 @@ defined('ABSPATH') || exit;
               <input id="zc_phone" type="text" name="phone" placeholder="Enter your phone number">
             </div>
 
+            <?php if ($selected_product_name) : ?>
+              <div class="zc-form-field">
+                <label for="zc_selected_product">Selected Product</label>
+                <input id="zc_selected_product" type="text" value="<?php echo esc_attr($selected_product_name); ?>" readonly>
+              </div>
+            <?php endif; ?>
+
             <div class="zc-form-field">
               <label for="zc_product_type">Product Type <span>*</span></label>
               <select id="zc_product_type" name="product_type" required>
                 <option value="">Select product type</option>
-                <option value="t-shirt">T-Shirt</option>
-                <option value="hoodie">Hoodie</option>
-                <option value="mug">Mug</option>
-                <option value="tote-bag">Tote Bag</option>
-                <option value="phone-case">Phone Case</option>
+                <option value="airpods" <?php selected($selected_product_type, 'airpods'); ?>>AirPods</option>
+                <option value="cap" <?php selected($selected_product_type, 'cap'); ?>>Cap</option>
+                <option value="t-shirt" <?php selected($selected_product_type, 't-shirt'); ?>>T-Shirt</option>
+                <option value="hoodie" <?php selected($selected_product_type, 'hoodie'); ?>>Hoodie</option>
+                <option value="sweatshirt" <?php selected($selected_product_type, 'sweatshirt'); ?>>Sweatshirt</option>
+                <option value="mug" <?php selected($selected_product_type, 'mug'); ?>>Mug</option>
+                <option value="tote-bag" <?php selected($selected_product_type, 'tote-bag'); ?>>Tote Bag</option>
+                <option value="phone-case" <?php selected($selected_product_type, 'phone-case'); ?>>Phone Case</option>
+                <option value="other" <?php selected($selected_product_type, 'other'); ?>>Other</option>
               </select>
             </div>
 

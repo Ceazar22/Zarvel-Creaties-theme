@@ -2,6 +2,39 @@
 defined('ABSPATH') || exit;
 
 /**
+ * Save a local copy so LocalWP submissions still work when wp_mail is not configured.
+ */
+function zarvel_save_customize_form_submission($subject, $message, $attachments = array()) {
+    $upload_dir = wp_upload_dir();
+
+    if (!empty($upload_dir['error']) || empty($upload_dir['basedir'])) {
+        return false;
+    }
+
+    $request_dir = trailingslashit($upload_dir['basedir']) . 'zarvel-design-requests';
+
+    if (!wp_mkdir_p($request_dir)) {
+        return false;
+    }
+
+    $filename = sanitize_file_name(gmdate('Y-m-d-His') . '-' . $subject . '.txt');
+    $file_path = trailingslashit($request_dir) . $filename;
+
+    $local_message = $message;
+
+    if (!empty($attachments)) {
+        $local_message .= "\nUploaded Files\n";
+        $local_message .= "--------------\n";
+
+        foreach ($attachments as $attachment) {
+            $local_message .= $attachment . "\n";
+        }
+    }
+
+    return (bool) file_put_contents($file_path, $local_message);
+}
+
+/**
  * Handle Design Details Form
  */
 function zarvel_handle_customize_form() {
@@ -45,14 +78,21 @@ function zarvel_handle_customize_form() {
         ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']))
         : 'unknown';
 
-    $rate_limit_key = 'zarvel_customize_form_' . md5($user_ip);
+    $is_local_site =
+        (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local') ||
+        strpos((string) home_url('/'), '.local') !== false ||
+        strpos((string) home_url('/'), 'localhost') !== false;
 
-    if (get_transient($rate_limit_key)) {
-        wp_safe_redirect(add_query_arg('request_status', 'too_many_requests', $redirect_url));
-        exit;
+    if (!$is_local_site) {
+        $rate_limit_key = 'zarvel_customize_form_' . md5($user_ip);
+
+        if (get_transient($rate_limit_key)) {
+            wp_safe_redirect(add_query_arg('request_status', 'too_many_requests', $redirect_url));
+            exit;
+        }
+
+        set_transient($rate_limit_key, true, 60);
     }
-
-    set_transient($rate_limit_key, true, 60);
 
     /**
      * Sanitize normal fields.
@@ -63,6 +103,16 @@ function zarvel_handle_customize_form() {
     $design_text  = isset($_POST['design_text']) ? sanitize_text_field(wp_unslash($_POST['design_text'])) : '';
     $preferred_colors = isset($_POST['preferred_colors']) ? sanitize_text_field(wp_unslash($_POST['preferred_colors'])) : '';
     $design_notes = isset($_POST['design_notes']) ? sanitize_textarea_field(wp_unslash($_POST['design_notes'])) : '';
+    $selected_product_id = isset($_POST['zc_product_id']) ? absint($_POST['zc_product_id']) : 0;
+    $selected_product_name = '';
+
+    if ($selected_product_id && function_exists('wc_get_product')) {
+        $selected_product = wc_get_product($selected_product_id);
+
+        if ($selected_product) {
+            $selected_product_name = $selected_product->get_name();
+        }
+    }
 
     /**
      * Normalize product type.
@@ -76,15 +126,21 @@ function zarvel_handle_customize_form() {
     $product_type = sanitize_title($raw_product_type);
 
     $product_aliases = array(
+        'airpods'     => 'airpods',
+        'airpod'      => 'airpods',
+        'cap'         => 'cap',
         'tshirt'      => 't-shirt',
         't-shirt'     => 't-shirt',
         't-shirt-'    => 't-shirt',
         'hoodie'      => 'hoodie',
+        'sweatshirt'  => 'sweatshirt',
+        'sweater'     => 'sweatshirt',
         'mug'         => 'mug',
         'tote'        => 'tote-bag',
         'tote-bag'    => 'tote-bag',
         'phonecase'   => 'phone-case',
         'phone-case'  => 'phone-case',
+        'other'       => 'other',
     );
 
     if (isset($product_aliases[$product_type])) {
@@ -163,11 +219,15 @@ function zarvel_handle_customize_form() {
      * Allowed product types.
      */
     $allowed_product_types = array(
+        'airpods',
+        'cap',
         't-shirt',
         'hoodie',
+        'sweatshirt',
         'mug',
         'tote-bag',
         'phone-case',
+        'other',
     );
 
     if (!in_array($product_type, $allowed_product_types, true)) {
@@ -207,11 +267,15 @@ function zarvel_handle_customize_form() {
      * Human-readable labels for email.
      */
     $product_type_labels = array(
+        'airpods'    => 'AirPods',
+        'cap'        => 'Cap',
         't-shirt'    => 'T-Shirt',
         'hoodie'     => 'Hoodie',
+        'sweatshirt' => 'Sweatshirt',
         'mug'        => 'Mug',
         'tote-bag'   => 'Tote Bag',
         'phone-case' => 'Phone Case',
+        'other'      => 'Other',
     );
 
     $logo_status_labels = array(
@@ -250,6 +314,9 @@ function zarvel_handle_customize_form() {
 
     $message .= "Product Request\n";
     $message .= "---------------\n";
+    if ($selected_product_name) {
+        $message .= "Selected Product: {$selected_product_name} (#{$selected_product_id})\n";
+    }
     $message .= "Product Type: {$product_type_label}\n";
     $message .= "Print Placement: {$print_location_label}\n";
     $message .= "Logo / Design Status: {$logo_status_label}\n\n";
@@ -341,11 +408,12 @@ function zarvel_handle_customize_form() {
      * Send email.
      */
     $sent = wp_mail($recipient, $subject, $message, $headers, $attachments);
+    $saved_locally = zarvel_save_customize_form_submission($subject, $message, $attachments);
 
     /**
-     * Delete uploaded file after sending email.
+     * Delete uploaded file after sending email only when no local saved copy needs it.
      */
-    if (!empty($attachments)) {
+    if ($sent && !$saved_locally && !empty($attachments)) {
         foreach ($attachments as $attachment) {
             if (file_exists($attachment)) {
                 wp_delete_file($attachment);
@@ -353,7 +421,7 @@ function zarvel_handle_customize_form() {
         }
     }
 
-    if ($sent) {
+    if ($sent || $saved_locally) {
         wp_safe_redirect(add_query_arg('request_status', 'success', $redirect_url));
         exit;
     }
