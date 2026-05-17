@@ -13,19 +13,6 @@ if (!$product) {
 
 wp_enqueue_script('wc-add-to-cart-variation');
 
-$zc_blank_products_url = home_url('/shop/');
-$zc_blank_categories = function_exists('zarvel_get_shop_categories')
-  ? zarvel_get_shop_categories(1)
-  : array();
-
-if (!empty($zc_blank_categories)) {
-  $zc_blank_category_url = get_term_link($zc_blank_categories[0]);
-
-  if (!is_wp_error($zc_blank_category_url)) {
-    $zc_blank_products_url = $zc_blank_category_url;
-  }
-}
-
 if (!function_exists('zc_sp_normalize_key')) {
   function zc_sp_normalize_key($value) {
     $value = strtolower(remove_accents((string) $value));
@@ -455,9 +442,9 @@ $zc_design_form_url = home_url('/customize/');
           remove_filter('woocommerce_product_single_add_to_cart_text', $button_text_filter);
           ?>
 
-          <a href="<?php echo esc_url($zc_blank_products_url); ?>" class="zc-shop-blank-btn" data-zc-shop-blank-btn>
-            SHOP BLANK SHIRTS
-          </a>
+          <button type="button" class="zc-shop-blank-btn" data-zc-shop-blank-btn>
+            ADD TO CART
+          </button>
         </div>
 
         <div class="zc-product-trust-row">
@@ -904,8 +891,52 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
+    function getMissingVariationLabels(form) {
+      const missing = [];
+
+      form.querySelectorAll('.variations select').forEach(function (select) {
+        if (select.value) return;
+
+        const row = select.closest('tr');
+        const label = row ? row.querySelector('label') : null;
+        const labelText = label ? label.textContent.trim() : 'option';
+
+        missing.push(labelText.replace(':', ''));
+      });
+
+      return missing;
+    }
+
+    function submitSelectedProductToCart() {
+      const form =
+        shopBlankBtn.closest('form.cart') ||
+        formArea.querySelector('form.cart');
+
+      if (!form) return;
+
+      const variationIdInput = form.querySelector('input[name="variation_id"]');
+      const variationId = variationIdInput && variationIdInput.value ? variationIdInput.value : '';
+      const missingVariationLabels = getMissingVariationLabels(form);
+
+      if (form.classList.contains('variations_form') && (missingVariationLabels.length || !variationId || variationId === '0')) {
+        if (window.jQuery) {
+          jQuery(form).trigger('check_variations');
+        }
+
+        alert('Please select ' + (missingVariationLabels.join(', ') || 'all product options') + ' first.');
+        return;
+      }
+
+      HTMLFormElement.prototype.submit.call(form);
+    }
+
     moveShopButton();
     setupQuantityButtons();
+
+    shopBlankBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      submitSelectedProductToCart();
+    });
 
     if (window.jQuery) {
       jQuery(function ($) {
