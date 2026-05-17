@@ -579,6 +579,53 @@ document.addEventListener('DOMContentLoaded', function () {
     return false;
   }
 
+  function getVariationImageObject(variation) {
+    if (!variation || !variation.image) return null;
+
+    const imageSrc = variation.image.full_src || variation.image.src || '';
+
+    if (!imageSrc) return null;
+
+    return {
+      large: imageSrc,
+      thumb: variation.image.thumb_src || variation.image.src || imageSrc,
+      full: imageSrc,
+      alt: variation.image.alt || ''
+    };
+  }
+
+  function renderSelectedVariationGallery(variation) {
+    const variationImage = getVariationImageObject(variation);
+
+    if (!variationImage) return false;
+
+    const galleryImages = [variationImage];
+    const seen = new Set([
+      variationImage.large,
+      variationImage.full,
+      variationImage.thumb
+    ].filter(Boolean));
+
+    const colorSelect = findColorSelect();
+
+    if (colorSelect && colorSelect.value) {
+      const key1 = normalizeColorName(colorSelect.value);
+      const key2 = normalizeColorName(getSelectedOptionText(colorSelect));
+      const colorImages = variationGalleryMap[key1] || variationGalleryMap[key2] || [];
+
+      colorImages.forEach(function (image) {
+        const imageKey = image.large || image.full || image.thumb || '';
+
+        if (!imageKey || seen.has(imageKey)) return;
+
+        galleryImages.push(image);
+        seen.add(imageKey);
+      });
+    }
+
+    return renderGallery(galleryImages);
+  }
+
   bindThumbClicks();
 
   const variationSelects = document.querySelectorAll('.variations select');
@@ -653,23 +700,12 @@ document.addEventListener('DOMContentLoaded', function () {
   if (window.jQuery) {
     jQuery(function ($) {
       $('.variations_form').on('found_variation', function (event, variation) {
+        if (renderSelectedVariationGallery(variation)) return;
+
         const colorSelect = findColorSelect();
 
         if (colorSelect && colorSelect.value) {
-          const rendered = setGalleryByColor(colorSelect.value, getSelectedOptionText(colorSelect));
-
-          if (rendered) return;
-        }
-
-        if (variation && variation.image && variation.image.full_src) {
-          renderGallery([
-            {
-              large: variation.image.full_src,
-              thumb: variation.image.thumb_src || variation.image.src || variation.image.full_src,
-              full: variation.image.full_src,
-              alt: variation.image.alt || ''
-            }
-          ]);
+          setGalleryByColor(colorSelect.value, getSelectedOptionText(colorSelect));
         }
       });
 
