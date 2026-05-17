@@ -255,23 +255,10 @@ if ($color_attribute_name && !empty($default_attributes[$color_attribute_name]))
   $initial_color_key = zc_sp_normalize_key($default_attributes[$color_attribute_name]);
 }
 
-if (!$initial_color_key && !empty($color_options[0]['primary_key'])) {
-  $initial_color_key = $color_options[0]['primary_key'];
-}
-
 $initial_gallery_images = [];
 
 if ($initial_color_key && !empty($zc_color_gallery_map[$initial_color_key])) {
   $initial_gallery_images = $zc_color_gallery_map[$initial_color_key];
-}
-
-if (empty($initial_gallery_images)) {
-  foreach ($zc_color_gallery_map as $gallery_images) {
-    if (!empty($gallery_images)) {
-      $initial_gallery_images = $gallery_images;
-      break;
-    }
-  }
 }
 
 if (empty($initial_gallery_images)) {
@@ -280,6 +267,15 @@ if (empty($initial_gallery_images)) {
   if ($fallback_image_obj) {
     $initial_gallery_images = [$fallback_image_obj];
   }
+}
+
+if (empty($initial_gallery_images) && $main_image_url) {
+  $initial_gallery_images = [[
+    'large' => $main_image_url,
+    'thumb' => $main_image_url,
+    'full'  => $main_image_url,
+    'alt'   => $main_image_alt ?: $product->get_name(),
+  ]];
 }
 
 $initial_main_image = !empty($initial_gallery_images[0]['large'])
@@ -469,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const defaultGallery = <?php echo wp_json_encode($initial_gallery_images); ?>;
   const zcDesignFormUrl = <?php echo wp_json_encode($zc_design_form_url); ?>;
   const zcCurrentProductId = <?php echo wp_json_encode($product->get_id()); ?>;
+  let zcVariationGalleryWasRendered = false;
 
   function normalizeColorName(colorName) {
     return String(colorName || '')
@@ -623,7 +620,44 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    return renderGallery(galleryImages);
+    const rendered = renderGallery(galleryImages);
+
+    if (rendered) {
+      zcVariationGalleryWasRendered = true;
+    }
+
+    return rendered;
+  }
+
+  function getCurrentVariationFromForm(form) {
+    if (!form || !window.jQuery) return null;
+
+    const variations = jQuery(form).data('product_variations') || [];
+
+    if (!Array.isArray(variations) || !variations.length) return null;
+
+    const selectedAttributes = {};
+
+    form.querySelectorAll('.variations select').forEach(function (select) {
+      selectedAttributes[select.name] = select.value || '';
+    });
+
+    return variations.find(function (variation) {
+      if (!variation || !variation.attributes) return false;
+
+      return Object.keys(variation.attributes).every(function (attributeName) {
+        const expectedValue = variation.attributes[attributeName] || '';
+        const selectedValue = selectedAttributes[attributeName] || '';
+
+        return expectedValue === '' || expectedValue === selectedValue;
+      });
+    }) || null;
+  }
+
+  function renderCurrentSelectedVariation(form) {
+    const variation = getCurrentVariationFromForm(form);
+
+    return renderSelectedVariationGallery(variation);
   }
 
   bindThumbClicks();
@@ -673,8 +707,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         button.classList.add('is-active');
 
-        if (isColor) {
-          setGalleryByColor(option.value, option.textContent);
+        if (window.jQuery) {
+          const form = select.closest('form.variations_form');
+
+          if (form) {
+            window.setTimeout(function () {
+              renderCurrentSelectedVariation(form);
+            }, 20);
+          }
         }
       });
 
@@ -699,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (window.jQuery) {
     jQuery(function ($) {
-      $('.variations_form').on('found_variation', function (event, variation) {
+      $('.variations_form').on('found_variation show_variation', function (event, variation) {
         if (renderSelectedVariationGallery(variation)) return;
 
         const colorSelect = findColorSelect();
@@ -710,10 +750,17 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       $('.variations_form').on('reset_data', function () {
+        zcVariationGalleryWasRendered = false;
         renderGallery(defaultGallery);
       });
 
       setTimeout(function () {
+        $('.variations_form').each(function () {
+          renderCurrentSelectedVariation(this);
+        });
+
+        if (zcVariationGalleryWasRendered) return;
+
         const colorSelect = findColorSelect();
 
         if (colorSelect && colorSelect.value) {

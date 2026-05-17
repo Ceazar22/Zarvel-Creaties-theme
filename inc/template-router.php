@@ -116,7 +116,31 @@ function zarvel_render_theme_only_route() {
         return;
     }
 
-    $template = zarvel_get_theme_only_route_template(zarvel_get_current_path());
+    $current_path = zarvel_get_current_path();
+    $theme_dir = get_template_directory();
+
+    $is_product_route =
+        strpos($current_path, 'product/') === 0 ||
+        (function_exists('is_product') && is_product()) ||
+        is_singular('product');
+
+    $is_product_category_route =
+        strpos($current_path, 'product-category/') === 0 ||
+        (function_exists('is_product_category') && is_product_category());
+
+    if ($is_product_route && file_exists($theme_dir . '/pages/single-product.php')) {
+        status_header(200);
+        include $theme_dir . '/pages/single-product.php';
+        exit;
+    }
+
+    if ($is_product_category_route && file_exists($theme_dir . '/pages/product-category.php')) {
+        status_header(200);
+        include $theme_dir . '/pages/product-category.php';
+        exit;
+    }
+
+    $template = zarvel_get_theme_only_route_template($current_path);
 
     if (!$template) {
         return;
@@ -126,7 +150,7 @@ function zarvel_render_theme_only_route() {
     include $template;
     exit;
 }
-add_action('template_redirect', 'zarvel_render_theme_only_route', 20);
+add_action('template_redirect', 'zarvel_render_theme_only_route', 1);
 
 /**
  * Custom template router.
