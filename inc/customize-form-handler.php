@@ -35,6 +35,49 @@ function zarvel_save_customize_form_submission($subject, $message, $attachments 
 }
 
 /**
+ * Keep design requests visible in wp-admin even when server email is blocked.
+ */
+function zarvel_register_design_request_post_type() {
+    register_post_type('zarvel_design_request', array(
+        'labels' => array(
+            'name'          => 'Design Requests',
+            'singular_name' => 'Design Request',
+            'menu_name'     => 'Design Requests',
+        ),
+        'public'       => false,
+        'show_ui'      => true,
+        'show_in_menu' => true,
+        'menu_icon'    => 'dashicons-feedback',
+        'supports'     => array('title', 'editor'),
+        'capability_type' => 'post',
+    ));
+}
+add_action('init', 'zarvel_register_design_request_post_type');
+
+function zarvel_save_customize_form_admin_post($subject, $message, $fields = array(), $attachments = array()) {
+    $post_id = wp_insert_post(array(
+        'post_type'    => 'zarvel_design_request',
+        'post_status'  => 'private',
+        'post_title'   => $subject,
+        'post_content' => $message,
+    ), true);
+
+    if (is_wp_error($post_id) || !$post_id) {
+        return 0;
+    }
+
+    foreach ($fields as $key => $value) {
+        update_post_meta($post_id, '_' . sanitize_key($key), sanitize_text_field((string) $value));
+    }
+
+    if (!empty($attachments)) {
+        update_post_meta($post_id, '_uploaded_files', array_map('sanitize_text_field', $attachments));
+    }
+
+    return (int) $post_id;
+}
+
+/**
  * Handle Design Details Form
  */
 function zarvel_handle_customize_form() {
@@ -103,6 +146,9 @@ function zarvel_handle_customize_form() {
     $design_text  = isset($_POST['design_text']) ? sanitize_text_field(wp_unslash($_POST['design_text'])) : '';
     $preferred_colors = isset($_POST['preferred_colors']) ? sanitize_text_field(wp_unslash($_POST['preferred_colors'])) : '';
     $design_notes = isset($_POST['design_notes']) ? sanitize_textarea_field(wp_unslash($_POST['design_notes'])) : '';
+    $selected_options = isset($_POST['selected_options']) ? sanitize_text_field(wp_unslash($_POST['selected_options'])) : '';
+    $print_location_extra_cost = isset($_POST['print_location_extra_cost']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_cost'])) : '0';
+    $print_location_extra_label = isset($_POST['print_location_extra_label']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_label'])) : '';
     $selected_product_id = isset($_POST['zc_product_id']) ? absint($_POST['zc_product_id']) : 0;
     $selected_product_name = '';
 
@@ -317,8 +363,21 @@ function zarvel_handle_customize_form() {
     if ($selected_product_name) {
         $message .= "Selected Product: {$selected_product_name} (#{$selected_product_id})\n";
     }
+    if ($selected_options) {
+        $message .= "Selected Options: {$selected_options}\n";
+    }
     $message .= "Product Type: {$product_type_label}\n";
     $message .= "Print Placement: {$print_location_label}\n";
+    if ($print_location_extra_cost === 'quote') {
+        $message .= "Estimated Placement Extra Cost: Quote required\n";
+    } elseif ((float) $print_location_extra_cost > 0) {
+        $message .= "Estimated Placement Extra Cost: +$" . number_format((float) $print_location_extra_cost, 2) . "\n";
+    } else {
+        $message .= "Estimated Placement Extra Cost: $0.00\n";
+    }
+    if ($print_location_extra_label) {
+        $message .= "Placement Cost Note: {$print_location_extra_label}\n";
+    }
     $message .= "Logo / Design Status: {$logo_status_label}\n\n";
 
     $message .= "Design Details\n";
@@ -349,9 +408,17 @@ function zarvel_handle_customize_form() {
     $safe_reply_name = str_replace(array("\r", "\n"), '', $full_name);
     $safe_reply_mail = str_replace(array("\r", "\n"), '', $email);
 
+    $site_host = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+    $site_host = preg_replace('/^www\./', '', $site_host);
+    $from_email = $site_host ? 'wordpress@' . $site_host : get_option('admin_email');
+
+    if (defined('ZARVEL_SMTP_FROM') && is_email(ZARVEL_SMTP_FROM)) {
+        $from_email = ZARVEL_SMTP_FROM;
+    }
+
     $headers = array(
         'Content-Type: text/plain; charset=UTF-8',
-        'From: Zarvel Creatives <bryanceazartabanas@gmail.com>',
+        'From: Zarvel Creatives <' . $from_email . '>',
         'Reply-To: ' . $safe_reply_name . ' <' . $safe_reply_mail . '>',
     );
 
@@ -407,6 +474,22 @@ function zarvel_handle_customize_form() {
     /**
      * Send email.
      */
+    $admin_post_id = zarvel_save_customize_form_admin_post($subject, $message, array(
+        'full_name'             => $full_name,
+        'email'                 => $email,
+        'phone'                 => $phone,
+        'selected_product_id'   => $selected_product_id,
+        'selected_product_name' => $selected_product_name,
+        'selected_options'      => $selected_options,
+        'product_type'          => $product_type_label,
+        'print_location'        => $print_location_label,
+        'print_location_extra_cost' => $print_location_extra_cost,
+        'print_location_extra_label' => $print_location_extra_label,
+        'logo_status'           => $logo_status_label,
+        'design_text'           => $design_text,
+        'preferred_colors'      => $preferred_colors,
+    ), $attachments);
+
     $sent = wp_mail($recipient, $subject, $message, $headers, $attachments);
     $saved_locally = zarvel_save_customize_form_submission($subject, $message, $attachments);
 
@@ -421,7 +504,7 @@ function zarvel_handle_customize_form() {
         }
     }
 
-    if ($sent || $saved_locally) {
+    if ($sent || $saved_locally || $admin_post_id) {
         wp_safe_redirect(add_query_arg('request_status', 'success', $redirect_url));
         exit;
     }

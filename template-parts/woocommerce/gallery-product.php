@@ -294,6 +294,22 @@ $button_text_filter = function () {
 };
 
 $zc_design_form_url = home_url('/customize/');
+$zc_modal_product_key = sanitize_title($product->get_name());
+$zc_modal_product_type = 'other';
+
+if (strpos($zc_modal_product_key, 'airpod') !== false) {
+  $zc_modal_product_type = 'airpods';
+} elseif (strpos($zc_modal_product_key, 'cap') !== false) {
+  $zc_modal_product_type = 'cap';
+} elseif (strpos($zc_modal_product_key, 'sweatshirt') !== false || strpos($zc_modal_product_key, 'sweater') !== false) {
+  $zc_modal_product_type = 'sweatshirt';
+} elseif (strpos($zc_modal_product_key, 'hoodie') !== false) {
+  $zc_modal_product_type = 'hoodie';
+} elseif (strpos($zc_modal_product_key, 'mug') !== false) {
+  $zc_modal_product_type = 'mug';
+} elseif (strpos($zc_modal_product_key, 't-shirt') !== false || strpos($zc_modal_product_key, 'shirt') !== false) {
+  $zc_modal_product_type = 't-shirt';
+}
 ?>
 
 <section class="zc-product-section">
@@ -455,6 +471,91 @@ $zc_design_form_url = home_url('/customize/');
 
   </div>
 </section>
+
+<div class="zc-design-modal" data-zc-design-modal aria-hidden="true">
+  <button class="zc-design-modal__overlay" type="button" data-zc-design-modal-close aria-label="Close design form"></button>
+
+  <div class="zc-design-modal__panel" role="dialog" aria-modal="true" aria-labelledby="zcDesignModalTitle">
+    <div class="zc-design-modal__header">
+      <div>
+        <p>Design Request</p>
+        <h2 id="zcDesignModalTitle">Tell Us Your Design</h2>
+      </div>
+
+      <button class="zc-design-modal__close" type="button" data-zc-design-modal-close aria-label="Close design form">
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <form class="zc-design-modal__form" method="post" action="<?php echo esc_url($zc_design_form_url); ?>" enctype="multipart/form-data">
+      <?php wp_nonce_field('zarvel_customize_form_action', 'zarvel_customize_nonce'); ?>
+
+      <input type="hidden" name="zarvel_customize_form_submit" value="1">
+      <input type="hidden" name="zc_product_id" value="<?php echo esc_attr($product->get_id()); ?>">
+      <input type="hidden" name="selected_options" data-zc-design-selected-options value="">
+
+      <div class="zc-design-modal__selected">
+        <span>Product</span>
+        <strong><?php echo esc_html($product->get_name()); ?></strong>
+        <em data-zc-design-selected-summary></em>
+      </div>
+
+      <div class="zc-design-modal__grid">
+        <label>
+          <span>Full Name *</span>
+          <input type="text" name="full_name" placeholder="Enter your full name" required>
+        </label>
+
+        <label>
+          <span>Email Address *</span>
+          <input type="email" name="email" placeholder="Enter your email address" required>
+        </label>
+
+        <label>
+          <span>Phone Number</span>
+          <input type="text" name="phone" placeholder="Enter your phone number">
+        </label>
+
+        <label>
+          <span>Print Placement *</span>
+          <select name="print_location" data-zc-placement-select required>
+            <option value="">Select print placement</option>
+            <option value="front" data-extra-cost="0" data-extra-label="No extra placement cost">Front</option>
+            <option value="back" data-extra-cost="5.95" data-extra-label="Estimated extra Printful placement cost">Back (+$5.95)</option>
+            <option value="front-and-back" data-extra-cost="5.95" data-extra-label="Estimated extra Printful placement cost">Front and Back (+$5.95)</option>
+            <option value="left-chest" data-extra-cost="0" data-extra-label="No extra placement cost">Left Chest</option>
+            <option value="sleeve" data-extra-cost="2.95" data-extra-label="Estimated extra Printful placement cost">Sleeve (+$2.95)</option>
+            <option value="other" data-extra-cost="quote" data-extra-label="Quote required for custom placement">Other / Not Sure</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Upload Logo / Artwork</span>
+          <input type="file" name="upload_file" accept=".jpg,.jpeg,.png,.pdf">
+        </label>
+      </div>
+
+      <input type="hidden" name="product_type" value="<?php echo esc_attr($zc_modal_product_type); ?>">
+      <input type="hidden" name="design_text" value="">
+      <input type="hidden" name="preferred_colors" value="">
+      <input type="hidden" name="print_location_extra_cost" data-zc-placement-extra-cost value="0">
+      <input type="hidden" name="print_location_extra_label" data-zc-placement-extra-label value="No extra placement cost">
+      <input type="hidden" name="logo_status" value="has-logo">
+
+      <div class="zc-design-modal__placement-cost" data-zc-placement-cost-note>
+        Front or left chest placement has no extra placement cost. Back and sleeve placements may increase the Printful production cost.
+      </div>
+
+      <label class="zc-design-modal__notes">
+        <span>Design Instructions *</span>
+        <textarea name="design_notes" rows="5" placeholder="Tell us about your design idea, placement, style, and anything important..." required></textarea>
+      </label>
+
+      <button type="submit" class="zc-design-modal__submit">Submit Design Form</button>
+    </form>
+  </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -779,6 +880,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function initZcSendDesignRequestToForm() {
     const formArea = document.querySelector('[data-zc-product-form-area]');
+    const designModal = document.querySelector('[data-zc-design-modal]');
+    const designModalSummary = document.querySelector('[data-zc-design-selected-summary]');
+    const designModalOptionsInput = document.querySelector('[data-zc-design-selected-options]');
+    const designModalCloseButtons = document.querySelectorAll('[data-zc-design-modal-close]');
+    const placementSelect = document.querySelector('[data-zc-placement-select]');
+    const placementCostNote = document.querySelector('[data-zc-placement-cost-note]');
+    const placementExtraCostInput = document.querySelector('[data-zc-placement-extra-cost]');
+    const placementExtraLabelInput = document.querySelector('[data-zc-placement-extra-label]');
 
     if (!formArea) return;
 
@@ -847,7 +956,30 @@ document.addEventListener('DOMContentLoaded', function () {
       return url.toString();
     }
 
-    function redirectToDesignForm(form) {
+    function getSelectedOptionsText(form) {
+      const selected = [];
+
+      form.querySelectorAll('.variations select').forEach(function (select) {
+        if (!select.value) return;
+
+        const row = select.closest('tr');
+        const label = row ? row.querySelector('label') : null;
+        const labelText = label ? label.textContent.trim().replace(':', '') : select.name;
+        const optionText = getSelectedOptionText(select) || select.value;
+
+        selected.push(labelText + ': ' + optionText);
+      });
+
+      const quantity = getQuantityFromForm(form);
+
+      if (quantity) {
+        selected.push('Quantity: ' + quantity);
+      }
+
+      return selected.join(' | ');
+    }
+
+    function openDesignModal(form) {
       if (!form) return;
 
       const isVariableForm = form.classList.contains('variations_form');
@@ -863,10 +995,84 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      window.location.href = buildDesignFormUrl(form);
+      const selectedOptionsText = getSelectedOptionsText(form);
+
+      if (designModalOptionsInput) {
+        designModalOptionsInput.value = selectedOptionsText;
+      }
+
+      if (designModalSummary) {
+        designModalSummary.textContent = selectedOptionsText;
+      }
+
+      if (!designModal) return;
+
+      designModal.classList.add('is-open');
+      designModal.setAttribute('aria-hidden', 'false');
+      document.documentElement.classList.add('zc-design-modal-lock');
+
+      const firstInput = designModal.querySelector('input[name="full_name"]');
+
+      if (firstInput) {
+        window.setTimeout(function () {
+          firstInput.focus();
+        }, 80);
+      }
+    }
+
+    function closeDesignModal() {
+      if (!designModal) return;
+
+      designModal.classList.remove('is-open');
+      designModal.setAttribute('aria-hidden', 'true');
+      document.documentElement.classList.remove('zc-design-modal-lock');
+    }
+
+    function updatePlacementCostNote() {
+      if (!placementSelect) return;
+
+      const selectedOption = placementSelect.options[placementSelect.selectedIndex];
+      const extraCost = selectedOption ? selectedOption.dataset.extraCost || '0' : '0';
+      const extraLabel = selectedOption ? selectedOption.dataset.extraLabel || 'No extra placement cost' : 'No extra placement cost';
+      let note = 'Front or left chest placement has no extra placement cost. Back and sleeve placements may increase the Printful production cost.';
+
+      if (extraCost === 'quote') {
+        note = 'Custom placement needs a quote before production.';
+      } else if (parseFloat(extraCost) > 0) {
+        note = extraLabel + ': +$' + parseFloat(extraCost).toFixed(2);
+      } else if (placementSelect.value) {
+        note = extraLabel + '.';
+      }
+
+      if (placementCostNote) {
+        placementCostNote.textContent = note;
+      }
+
+      if (placementExtraCostInput) {
+        placementExtraCostInput.value = extraCost;
+      }
+
+      if (placementExtraLabelInput) {
+        placementExtraLabelInput.value = extraLabel;
+      }
     }
 
     keepDesignRequestButtonsClickable();
+
+    designModalCloseButtons.forEach(function (button) {
+      button.addEventListener('click', closeDesignModal);
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && designModal && designModal.classList.contains('is-open')) {
+        closeDesignModal();
+      }
+    });
+
+    if (placementSelect) {
+      placementSelect.addEventListener('change', updatePlacementCostNote);
+      updatePlacementCostNote();
+    }
 
     formArea.addEventListener('click', function (event) {
       const button = event.target.closest('.single_add_to_cart_button');
@@ -881,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', function () {
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      redirectToDesignForm(form);
+      openDesignModal(form);
     }, true);
 
     formArea.addEventListener('submit', function (event) {
@@ -893,7 +1099,7 @@ document.addEventListener('DOMContentLoaded', function () {
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      redirectToDesignForm(form);
+      openDesignModal(form);
     }, true);
 
     if (window.jQuery) {
@@ -1590,6 +1796,224 @@ document.addEventListener('DOMContentLoaded', function () {
   color: #ffffff;
 }
 
+.zc-design-modal-lock {
+  overflow: hidden;
+}
+
+.zc-design-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none;
+}
+
+.zc-design-modal.is-open {
+  display: block;
+}
+
+.zc-design-modal__overlay {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.62);
+  cursor: pointer;
+}
+
+.zc-design-modal__panel {
+  position: relative;
+  width: min(100% - 32px, 820px);
+  max-height: min(90vh, 860px);
+  margin: 5vh auto;
+  padding: 24px;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow-y: auto;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.28);
+}
+
+.zc-design-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.zc-design-modal__header p {
+  margin: 0 0 6px;
+  color: #ff5b1a;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.zc-design-modal__header h2 {
+  margin: 0;
+  color: #111111;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.zc-design-modal__close {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #eeeeee;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.zc-design-modal__close span {
+  position: absolute;
+  top: 18px;
+  left: 10px;
+  width: 16px;
+  height: 2px;
+  background: #111111;
+}
+
+.zc-design-modal__close span:first-child {
+  transform: rotate(45deg);
+}
+
+.zc-design-modal__close span:last-child {
+  transform: rotate(-45deg);
+}
+
+.zc-design-modal__selected {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #eeeeee;
+  border-radius: 6px;
+  background: #fafafa;
+  display: grid;
+  gap: 5px;
+}
+
+.zc-design-modal__selected span,
+.zc-design-modal__form label span,
+.zc-design-modal__notes span {
+  color: #111111;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.zc-design-modal__selected strong {
+  color: #111111;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 900;
+}
+
+.zc-design-modal__selected em {
+  color: #666666;
+  font-size: 13px;
+  line-height: 1.35;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.zc-design-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.zc-design-modal__form label {
+  display: grid;
+  gap: 8px;
+}
+
+.zc-design-modal__form input,
+.zc-design-modal__form select,
+.zc-design-modal__form textarea {
+  width: 100%;
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 650;
+  outline: 0;
+}
+
+.zc-design-modal__form input,
+.zc-design-modal__form select {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.zc-design-modal__form input[type="file"] {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.zc-design-modal__form input[type="file"]::file-selector-button {
+  min-height: 30px;
+  margin-right: 12px;
+  border: 0;
+  border-radius: 5px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.zc-design-modal__form textarea {
+  min-height: 118px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.zc-design-modal__form input:focus,
+.zc-design-modal__form select:focus,
+.zc-design-modal__form textarea:focus {
+  border-color: #ff5b1a;
+  box-shadow: 0 0 0 3px rgba(255, 91, 26, 0.12);
+}
+
+.zc-design-modal__notes {
+  margin-top: 14px;
+}
+
+.zc-design-modal__placement-cost {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #fff4ed;
+  color: #8f330e;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 750;
+}
+
+.zc-design-modal__submit {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #ff5b1a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 950;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.zc-design-modal__submit:hover {
+  background: #111111;
+}
+
 .zc-product-trust-row {
   display: flex;
   align-items: center;
@@ -1677,6 +2101,21 @@ document.addEventListener('DOMContentLoaded', function () {
   .zc-shop-blank-btn {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .zc-design-modal__panel {
+    width: min(100% - 20px, 820px);
+    max-height: 94vh;
+    margin: 3vh auto;
+    padding: 18px;
+  }
+
+  .zc-design-modal__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .zc-design-modal__header h2 {
+    font-size: 24px;
   }
 }
 

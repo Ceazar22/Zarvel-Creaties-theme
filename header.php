@@ -122,10 +122,6 @@
           </span>
         </a>
 
-        <a href="<?php echo esc_url(home_url('/customize')); ?>" class="zc-customize-btn">
-          FILL OUT FORM
-        </a>
-
       </div>
 
     </div>
@@ -755,27 +751,6 @@ body.admin-bar .zc-header {
   justify-content: center;
 }
 
-.zc-customize-btn {
-  background: #ff6a21;
-  color: #ffffff;
-  text-decoration: none;
-  border-radius: 6px;
-  padding: 16px 28px;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.2s ease;
-  white-space: nowrap;
-}
-
-.zc-customize-btn:hover {
-  background: #e95713;
-  color: #ffffff;
-}
-
 /* Search Modal */
 .zc-search-lock {
   overflow: hidden;
@@ -1370,12 +1345,7 @@ body.admin-bar .zc-header {
   transition: 0.2s ease;
 }
 
-/* Hide START CUSTOMIZING from 769px to 1024px */
 @media screen and (min-width: 769px) and (max-width: 1024px) {
-  .zc-customize-btn {
-    display: none;
-  }
-
   .zc-nav {
     gap: 26px;
   }
@@ -1484,11 +1454,6 @@ body.admin-bar .zc-header {
     justify-content: flex-start;
     flex-wrap: wrap;
     padding: 10px 0 20px;
-  }
-
-  .zc-customize-btn {
-    width: 100%;
-    padding: 15px 20px;
   }
 
   .zc-mobile-toggle.is-active span:nth-child(1) {
