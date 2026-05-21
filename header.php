@@ -36,8 +36,11 @@
 
       <!-- Logo -->
       <a href="<?php echo esc_url(home_url('/')); ?>" class="zc-logo">
-        <span class="zc-logo__main">PRINTLY</span>
-        <span class="zc-logo__sub">CUSTOM. YOUR WAY.</span>
+        <img
+          class="zc-logo__image"
+          src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/zarvel logo.png'); ?>"
+          alt="<?php echo esc_attr(get_bloginfo('name')); ?>"
+        >
       </a>
 
       <!-- Mobile Toggle -->
@@ -564,23 +567,16 @@ body.admin-bar .zc-header {
 .zc-logo {
   color: #111111;
   text-decoration: none;
-  display: flex;
-  flex-direction: column;
-  line-height: 1;
+  display: block;
   flex-shrink: 0;
 }
 
-.zc-logo__main {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -1.5px;
-}
-
-.zc-logo__sub {
-  margin-top: 6px;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 1.3px;
+.zc-logo__image {
+  display: block;
+  width: 184px;
+  height: 58px;
+  object-fit: cover;
+  object-position: center;
 }
 
 /* Navigation */
@@ -1386,8 +1382,9 @@ body.admin-bar .zc-header {
     flex-wrap: wrap;
   }
 
-  .zc-logo__main {
-    font-size: 24px;
+  .zc-logo__image {
+    width: 152px;
+    height: 48px;
   }
 
   .zc-mobile-toggle {

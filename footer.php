@@ -7,8 +7,11 @@
       <!-- Brand -->
       <div class="site-footer__brand">
         <a href="<?php echo esc_url(home_url('/')); ?>" class="site-footer__logo">
-          <span class="site-footer__logo-main">PRINTLY</span>
-          <span class="site-footer__logo-sub">CUSTOM. YOUR WAY.</span>
+          <img
+            class="site-footer__logo-image"
+            src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/zarvel logo.png'); ?>"
+            alt="<?php echo esc_attr(get_bloginfo('name')); ?>"
+          >
         </a>
 
         <p>
@@ -171,22 +174,16 @@
 .site-footer__logo {
   color: #ffffff;
   text-decoration: none;
-  display: inline-flex;
-  flex-direction: column;
-  line-height: 1;
+  display: inline-block;
 }
 
-.site-footer__logo-main {
-  font-size: 30px;
-  font-weight: 950;
-  letter-spacing: -1.5px;
-}
-
-.site-footer__logo-sub {
-  margin-top: 5px;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 1.4px;
+.site-footer__logo-image {
+  display: block;
+  width: 212px;
+  height: 68px;
+  object-fit: cover;
+  object-position: center;
+  filter: invert(1);
 }
 
 .site-footer__socials {
