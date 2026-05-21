@@ -246,6 +246,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
               array(
                 'zc_cart_item' => rawurlencode($cart_item_key),
                 'zc_qty'       => max(0, $zc_quantity - 1),
+                'zc_open_cart' => '1',
               )
             ),
             'zc_sidecart_qty_' . $cart_item_key
@@ -255,6 +256,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
               array(
                 'zc_cart_item' => rawurlencode($cart_item_key),
                 'zc_qty'       => $zc_quantity + 1,
+                'zc_open_cart' => '1',
               )
             ),
             'zc_sidecart_qty_' . $cart_item_key
@@ -282,7 +284,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
             }
           }
 
-          if (!empty($cart_item['zc_custom_design'])) {
+          if (!empty($cart_item['zc_custom_design']) && empty($cart_item['zc_design_request'])) {
             $zc_variation_rows[] = 'Custom design: ' . (!empty($cart_item['zc_design_title']) ? $cart_item['zc_design_title'] : 'Untitled Design');
 
             if (!empty($cart_item['zc_imprint'])) {
@@ -294,7 +296,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
             }
           }
           ?>
-          <article class="zc-sidecart__item">
+          <article class="zc-sidecart__item" data-zc-sidecart-item="<?php echo esc_attr($cart_item_key); ?>">
             <a class="zc-sidecart__thumb" href="<?php echo esc_url($zc_product_permalink ?: $zc_cart_url); ?>">
               <?php echo wp_kses_post($zc_product_image); ?>
             </a>
@@ -319,12 +321,12 @@ $zc_cart_subtotal_html = function_exists('wc_price')
 
               <div class="zc-sidecart__item-bottom">
                 <div class="zc-sidecart__qty" aria-label="Quantity">
-                  <a href="<?php echo esc_url($zc_decrease_url); ?>" aria-label="Decrease quantity">−</a>
-                  <b><?php echo esc_html($zc_quantity); ?></b>
-                  <a href="<?php echo esc_url($zc_increase_url); ?>" aria-label="Increase quantity">+</a>
+                  <a href="<?php echo esc_url($zc_decrease_url); ?>" data-zc-sidecart-qty="decrease" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" aria-label="Decrease quantity">−</a>
+                  <b data-zc-sidecart-quantity><?php echo esc_html($zc_quantity); ?></b>
+                  <a href="<?php echo esc_url($zc_increase_url); ?>" data-zc-sidecart-qty="increase" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" aria-label="Increase quantity">+</a>
                 </div>
 
-                <a class="zc-sidecart__remove" href="<?php echo esc_url($zc_remove_url); ?>" aria-label="Remove <?php echo esc_attr($zc_product_name); ?>">
+                <a class="zc-sidecart__remove" href="<?php echo esc_url($zc_remove_url); ?>" data-zc-sidecart-remove data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" aria-label="Remove <?php echo esc_attr($zc_product_name); ?>">
                   <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                     <path d="M4 7h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                     <path d="M9 7V5h6v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -347,8 +349,8 @@ $zc_cart_subtotal_html = function_exists('wc_price')
 
     <div class="zc-sidecart__summary">
       <div>
-        <span>Subtotal (<?php echo esc_html($zc_cart_count); ?> item<?php echo $zc_cart_count === 1 ? '' : 's'; ?>)</span>
-        <strong><?php echo wp_kses_post($zc_cart_subtotal_html); ?></strong>
+        <span data-zc-sidecart-subtotal-label>Subtotal (<?php echo esc_html($zc_cart_count); ?> item<?php echo $zc_cart_count === 1 ? '' : 's'; ?>)</span>
+        <strong data-zc-sidecart-subtotal><?php echo wp_kses_post($zc_cart_subtotal_html); ?></strong>
       </div>
       <div>
         <span>Shipping</span>
@@ -357,7 +359,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
       <hr>
       <div class="zc-sidecart__total">
         <span>Total</span>
-        <strong><?php echo wp_kses_post($zc_cart_total_html); ?></strong>
+        <strong data-zc-sidecart-total><?php echo wp_kses_post($zc_cart_total_html); ?></strong>
       </div>
 
       <a class="zc-sidecart__view-cart" href="<?php echo esc_url($zc_cart_url); ?>">View Cart</a>
@@ -392,6 +394,13 @@ document.addEventListener('DOMContentLoaded', function () {
   const cartTriggers = document.querySelectorAll('[data-zc-sidecart-open]');
   const sidecart = document.querySelector('[data-zc-sidecart]');
   const sidecartCloseButtons = document.querySelectorAll('[data-zc-sidecart-close]');
+  const sidecartAjaxUrl = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+  const sidecartAjaxNonce = <?php echo wp_json_encode(wp_create_nonce('zc_sidecart_ajax')); ?>;
+  const sidecartEmptyHtml = <?php echo wp_json_encode(
+    '<div class="zc-sidecart__empty"><h3>Your cart is empty.</h3><p>Add a custom product to get started.</p><a href="' .
+    esc_url(home_url('/shop')) .
+    '">Shop Products</a></div>'
+  ); ?>;
   const searchTriggers = document.querySelectorAll('[data-zc-search-open]');
   const searchModal = document.querySelector('[data-zc-search-modal]');
   const searchCloseButtons = document.querySelectorAll('[data-zc-search-close]');
@@ -449,6 +458,98 @@ document.addEventListener('DOMContentLoaded', function () {
   sidecartCloseButtons.forEach(function (button) {
     button.addEventListener('click', closeSidecart);
   });
+
+  function updateSidecartState(data, item) {
+    const sidecartItems = sidecart ? sidecart.querySelector('.zc-sidecart__items') : null;
+    const quantity = item ? item.querySelector('[data-zc-sidecart-quantity]') : null;
+    const subtotalLabel = sidecart ? sidecart.querySelector('[data-zc-sidecart-subtotal-label]') : null;
+    const subtotal = sidecart ? sidecart.querySelector('[data-zc-sidecart-subtotal]') : null;
+    const shipping = sidecart ? sidecart.querySelector('.zc-sidecart__free') : null;
+    const total = sidecart ? sidecart.querySelector('[data-zc-sidecart-total]') : null;
+
+    document.querySelectorAll('.zc-cart-count').forEach(function (count) {
+      count.textContent = data.cart_count;
+    });
+
+    if (sidecart) {
+      sidecart.querySelectorAll('.zc-sidecart__count').forEach(function (count) {
+        count.textContent = data.cart_count;
+      });
+    }
+
+    if (subtotalLabel) subtotalLabel.textContent = data.count_label;
+    if (subtotal) subtotal.innerHTML = data.subtotal_html;
+    if (shipping) shipping.innerHTML = data.shipping_label;
+    if (total) total.innerHTML = data.total_html;
+
+    if (item && data.item_exists && quantity) {
+      quantity.textContent = data.item_quantity;
+    } else if (item) {
+      item.remove();
+    }
+
+    if (sidecartItems && Number(data.cart_count) === 0) {
+      sidecartItems.innerHTML = sidecartEmptyHtml;
+    }
+  }
+
+  function mutateSidecart(action, itemKey, item, operation) {
+    if (!sidecart || !itemKey || sidecart.classList.contains('is-updating')) return;
+
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('nonce', sidecartAjaxNonce);
+    formData.append('cart_item_key', itemKey);
+
+    if (operation) {
+      formData.append('operation', operation);
+    }
+
+    sidecart.classList.add('is-updating');
+
+    fetch(sidecartAjaxUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (result) {
+        if (!result.success || !result.data) {
+          throw new Error(result.data && result.data.message ? result.data.message : 'Cart update failed.');
+        }
+
+        updateSidecartState(result.data, item);
+      })
+      .catch(function (error) {
+        console.error(error);
+      })
+      .finally(function () {
+        sidecart.classList.remove('is-updating');
+      });
+  }
+
+  if (sidecart) {
+    sidecart.addEventListener('click', function (event) {
+      const quantityLink = event.target.closest('[data-zc-sidecart-qty]');
+      const removeLink = event.target.closest('[data-zc-sidecart-remove]');
+      const control = quantityLink || removeLink;
+
+      if (!control) return;
+
+      const item = control.closest('[data-zc-sidecart-item]');
+      const itemKey = control.dataset.cartItemKey || (item ? item.dataset.zcSidecartItem : '');
+
+      event.preventDefault();
+
+      if (quantityLink) {
+        mutateSidecart('zc_sidecart_quantity', itemKey, item, quantityLink.dataset.zcSidecartQty);
+      } else {
+        mutateSidecart('zc_sidecart_remove', itemKey, item);
+      }
+    });
+  }
 
   searchTriggers.forEach(function (trigger) {
     trigger.addEventListener('click', function (event) {
@@ -571,7 +672,7 @@ body.admin-bar .zc-header {
   flex-shrink: 0;
 }
 
-.zc-logo__image {
+.zc-logo .zc-logo__image {
   display: block;
   width: 184px;
   height: 58px;
@@ -1204,6 +1305,12 @@ body.admin-bar .zc-header {
   color: #ff5b1a;
 }
 
+.zc-sidecart.is-updating .zc-sidecart__qty,
+.zc-sidecart.is-updating .zc-sidecart__remove {
+  opacity: 0.58;
+  pointer-events: none;
+}
+
 .zc-sidecart__summary {
   padding: 30px 30px 16px;
   margin-top: 12px;
@@ -1382,7 +1489,7 @@ body.admin-bar .zc-header {
     flex-wrap: wrap;
   }
 
-  .zc-logo__image {
+  .zc-logo .zc-logo__image {
     width: 152px;
     height: 48px;
   }

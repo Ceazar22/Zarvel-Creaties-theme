@@ -73,7 +73,9 @@ if (function_exists('WC') && WC()->cart) {
               <div class="zc-cart-item__body">
                 <h2><?php echo esc_html($product->get_name()); ?></h2>
 
-                <?php if (!empty($cart_item['zc_custom_design'])) : ?>
+                <?php if (!empty($cart_item['zc_design_request'])) : ?>
+                  <p>Design note: Customer wants a design.</p>
+                <?php elseif (!empty($cart_item['zc_custom_design'])) : ?>
                   <p>Custom design: <?php echo esc_html(!empty($cart_item['zc_design_title']) ? $cart_item['zc_design_title'] : 'Untitled Design'); ?></p>
                 <?php endif; ?>
 

@@ -492,7 +492,11 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
       <?php wp_nonce_field('zarvel_customize_form_action', 'zarvel_customize_nonce'); ?>
 
       <input type="hidden" name="zarvel_customize_form_submit" value="1">
+      <input type="hidden" name="zc_product_form_submission" value="1">
       <input type="hidden" name="zc_product_id" value="<?php echo esc_attr($product->get_id()); ?>">
+      <input type="hidden" name="zc_return_url" value="<?php echo esc_url($product->get_permalink()); ?>">
+      <input type="hidden" name="zc_variation_id" data-zc-design-variation-id value="">
+      <input type="hidden" name="quantity" data-zc-design-quantity value="1">
       <input type="hidden" name="selected_options" data-zc-design-selected-options value="">
 
       <div class="zc-design-modal__selected">
@@ -883,6 +887,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const designModal = document.querySelector('[data-zc-design-modal]');
     const designModalSummary = document.querySelector('[data-zc-design-selected-summary]');
     const designModalOptionsInput = document.querySelector('[data-zc-design-selected-options]');
+    const designModalVariationInput = document.querySelector('[data-zc-design-variation-id]');
+    const designModalQuantityInput = document.querySelector('[data-zc-design-quantity]');
     const designModalCloseButtons = document.querySelectorAll('[data-zc-design-modal-close]');
     const placementSelect = document.querySelector('[data-zc-placement-select]');
     const placementCostNote = document.querySelector('[data-zc-placement-cost-note]');
@@ -999,6 +1005,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (designModalOptionsInput) {
         designModalOptionsInput.value = selectedOptionsText;
+      }
+
+      if (designModalVariationInput) {
+        designModalVariationInput.value = variationId && variationId !== '0' ? variationId : '';
+      }
+
+      if (designModalQuantityInput) {
+        designModalQuantityInput.value = getQuantityFromForm(form);
       }
 
       if (designModalSummary) {

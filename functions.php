@@ -27,6 +27,13 @@ zarvel_require_file('/inc/template-router.php');
 zarvel_require_file('/inc/security-hardening.php');
 
 /**
+ * Keep storefront price formatting in US dollars.
+ */
+add_filter('woocommerce_currency', function ($currency) {
+    return 'USD';
+}, 20);
+
+/**
  * Get real WooCommerce product categories for theme navigation.
  */
 function zarvel_get_shop_categories($limit = 0) {
@@ -130,7 +137,11 @@ function zarvel_refresh_cart_totals() {
     }
 
     WC()->cart->calculate_shipping();
-    WC()->cart->calculate_totals();
+    if (WC()->cart->is_empty()) {
+        WC()->cart->calculate_totals();
+    } else {
+        zarvel_refresh_cart_totals();
+    }
 }
 
 add_action('woocommerce_shipping_init', function () {
@@ -343,6 +354,86 @@ add_action('template_redirect', function () {
 });
 
 /**
+ * JSON state for AJAX side cart quantity and remove controls.
+ */
+function zarvel_send_sidecart_state($cart_item_key = '') {
+    if (!function_exists('WC') || !WC()->cart) {
+        wp_send_json_error(array('message' => __('Cart is unavailable.', 'zarvel-creative')), 400);
+    }
+
+    WC()->cart->calculate_totals();
+
+    $cart_item = $cart_item_key && isset(WC()->cart->cart_contents[$cart_item_key])
+        ? WC()->cart->cart_contents[$cart_item_key]
+        : array();
+    $cart_count = WC()->cart->get_cart_contents_count();
+    $cart_subtotal = (float) WC()->cart->get_subtotal();
+
+    wp_send_json_success(array(
+        'cart_count'      => $cart_count,
+        'count_label'     => sprintf(
+            /* translators: %s: cart item count. */
+            _n('Subtotal (%s item)', 'Subtotal (%s items)', $cart_count, 'zarvel-creative'),
+            $cart_count
+        ),
+        'subtotal_html'   => function_exists('wc_price') ? wc_price($cart_subtotal) : '$' . number_format($cart_subtotal, 2),
+        'shipping_label'  => zarvel_get_cart_shipping_label(),
+        'total_html'      => zarvel_get_cart_total_html(),
+        'item_exists'     => !empty($cart_item),
+        'item_quantity'   => !empty($cart_item['quantity']) ? (int) $cart_item['quantity'] : 0,
+    ));
+}
+
+function zarvel_require_sidecart_ajax_cart() {
+    if (!function_exists('WC')) {
+        wp_send_json_error(array('message' => __('WooCommerce is unavailable.', 'zarvel-creative')), 400);
+    }
+
+    if (!WC()->cart && function_exists('wc_load_cart')) {
+        wc_load_cart();
+    }
+
+    if (!WC()->cart) {
+        wp_send_json_error(array('message' => __('Cart is unavailable.', 'zarvel-creative')), 400);
+    }
+
+    check_ajax_referer('zc_sidecart_ajax', 'nonce');
+}
+
+function zarvel_sidecart_quantity_ajax() {
+    zarvel_require_sidecart_ajax_cart();
+
+    $cart_item_key = isset($_POST['cart_item_key']) ? sanitize_text_field(wp_unslash($_POST['cart_item_key'])) : '';
+    $operation = isset($_POST['operation']) ? sanitize_key(wp_unslash($_POST['operation'])) : '';
+
+    if (!$cart_item_key || !isset(WC()->cart->cart_contents[$cart_item_key])) {
+        wp_send_json_error(array('message' => __('Cart item was not found.', 'zarvel-creative')), 404);
+    }
+
+    $quantity = (int) WC()->cart->cart_contents[$cart_item_key]['quantity'];
+    $quantity += $operation === 'increase' ? 1 : -1;
+
+    WC()->cart->set_quantity($cart_item_key, max(0, $quantity), true);
+    zarvel_send_sidecart_state($cart_item_key);
+}
+add_action('wp_ajax_zc_sidecart_quantity', 'zarvel_sidecart_quantity_ajax');
+add_action('wp_ajax_nopriv_zc_sidecart_quantity', 'zarvel_sidecart_quantity_ajax');
+
+function zarvel_sidecart_remove_ajax() {
+    zarvel_require_sidecart_ajax_cart();
+
+    $cart_item_key = isset($_POST['cart_item_key']) ? sanitize_text_field(wp_unslash($_POST['cart_item_key'])) : '';
+
+    if ($cart_item_key && isset(WC()->cart->cart_contents[$cart_item_key])) {
+        WC()->cart->remove_cart_item($cart_item_key);
+    }
+
+    zarvel_send_sidecart_state($cart_item_key);
+}
+add_action('wp_ajax_zc_sidecart_remove', 'zarvel_sidecart_remove_ajax');
+add_action('wp_ajax_nopriv_zc_sidecart_remove', 'zarvel_sidecart_remove_ajax');
+
+/**
  * Add customizer design to WooCommerce cart.
  */
 function zarvel_customizer_add_to_cart_ajax() {
@@ -449,5 +540,40 @@ add_action('woocommerce_checkout_create_order_line_item', function ($item, $cart
 
     if (!empty($values['zc_imprint_size'])) {
         $item->add_meta_data(__('Imprint size', 'zarvel-creative'), $values['zc_imprint_size']);
+    }
+
+    if (empty($values['zc_design_request']) || empty($values['zc_design_details']) || !is_array($values['zc_design_details'])) {
+        return;
+    }
+
+    $details = $values['zc_design_details'];
+    $item->add_meta_data(__('Design help requested', 'zarvel-creative'), __('Yes', 'zarvel-creative'));
+
+    $detail_labels = array(
+        'full_name'                  => __('Design contact name', 'zarvel-creative'),
+        'email'                      => __('Design contact email', 'zarvel-creative'),
+        'phone'                      => __('Design contact phone', 'zarvel-creative'),
+        'product_type'               => __('Requested product type', 'zarvel-creative'),
+        'print_location'             => __('Print placement', 'zarvel-creative'),
+        'print_location_extra_cost'  => __('Placement extra cost', 'zarvel-creative'),
+        'print_location_extra_label' => __('Placement cost note', 'zarvel-creative'),
+        'logo_status'                => __('Logo status', 'zarvel-creative'),
+        'design_text'                => __('Design text', 'zarvel-creative'),
+        'preferred_colors'           => __('Preferred colors', 'zarvel-creative'),
+        'design_notes'               => __('Design instructions', 'zarvel-creative'),
+        'selected_options'           => __('Selected options', 'zarvel-creative'),
+    );
+
+    foreach ($detail_labels as $detail_key => $detail_label) {
+        if (!empty($details[$detail_key])) {
+            $item->add_meta_data($detail_label, sanitize_textarea_field((string) $details[$detail_key]));
+        }
+    }
+
+    if (!empty($details['uploaded_files']) && is_array($details['uploaded_files'])) {
+        $item->add_meta_data(
+            __('Uploaded design files', 'zarvel-creative'),
+            implode("\n", array_map('sanitize_text_field', $details['uploaded_files']))
+        );
     }
 }, 10, 3);
