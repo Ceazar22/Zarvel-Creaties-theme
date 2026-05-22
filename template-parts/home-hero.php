@@ -6,7 +6,7 @@
 
       <h1 class="zc-hero-title">
         CUSTOM PRINTS <br>
-        MADE FOR YOUR STYLE
+        MADE FOR YOUR 1STYLE
       </h1>
 
       <p class="zc-hero-text">
