@@ -48,6 +48,14 @@ function zarvel_get_design_deposit_product_id() {
     $product_id = (int) wc_get_product_id_by_sku('zarvel-design-deposit');
 
     if ($product_id) {
+        $deposit = wc_get_product($product_id);
+
+        if ($deposit && (!$deposit->is_virtual() || !$deposit->is_sold_individually())) {
+            $deposit->set_virtual(true);
+            $deposit->set_sold_individually(true);
+            $deposit->save();
+        }
+
         return $product_id;
     }
 
@@ -67,6 +75,26 @@ function zarvel_get_design_deposit_product_id() {
     return (int) $deposit->save();
 }
 
+function zarvel_get_design_request_deposit_amount($design_request_id) {
+    $fallback_amount = (float) ZARVEL_DESIGN_DEPOSIT_AMOUNT;
+    $selected_variation_id = $design_request_id
+        ? absint(get_post_meta($design_request_id, '_selected_variation_id', true))
+        : 0;
+    $selected_product_id = $design_request_id
+        ? absint(get_post_meta($design_request_id, '_selected_product_id', true))
+        : 0;
+    $selected_product = function_exists('wc_get_product') && ($selected_variation_id || $selected_product_id)
+        ? wc_get_product($selected_variation_id ?: $selected_product_id)
+        : null;
+    $selected_product_price = $selected_product ? (float) $selected_product->get_price() : 0;
+
+    if ($selected_product_price <= 0) {
+        return $fallback_amount;
+    }
+
+    return round($selected_product_price * 0.5, wc_get_price_decimals());
+}
+
 function zarvel_get_design_deposit_checkout_url($design_request_id = 0) {
     $product_id = zarvel_get_design_deposit_product_id();
 
@@ -80,28 +108,101 @@ function zarvel_get_design_deposit_checkout_url($design_request_id = 0) {
         'add-to-cart' => $product_id,
     );
 
-    if ($design_request_id && get_post_type($design_request_id) === 'zarvel_design_request') {
+    if ($design_request_id && get_post_type($design_request_id) === ZARVEL_DESIGN_REQUEST_TYPE) {
         $checkout_args['zc_design_request'] = $design_request_id;
     }
 
     return add_query_arg($checkout_args, $checkout_url);
 }
 
+function zarvel_remove_design_deposits_from_cart() {
+    if (!function_exists('WC') || !WC()->cart) {
+        return;
+    }
+
+    $deposit_product_id = zarvel_get_design_deposit_product_id();
+
+    if (!$deposit_product_id) {
+        return;
+    }
+
+    foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+        if (!empty($cart_item['product_id']) && (int) $cart_item['product_id'] === $deposit_product_id) {
+            WC()->cart->remove_cart_item($cart_item_key);
+        }
+    }
+}
+
+add_action('wp_loaded', function () {
+    $add_to_cart_product_id = isset($_REQUEST['add-to-cart']) ? absint(wp_unslash($_REQUEST['add-to-cart'])) : 0;
+    $design_request_id = isset($_REQUEST['zc_design_request']) ? absint(wp_unslash($_REQUEST['zc_design_request'])) : 0;
+
+    if (
+        !$add_to_cart_product_id ||
+        !$design_request_id ||
+        get_post_type($design_request_id) !== ZARVEL_DESIGN_REQUEST_TYPE ||
+        $add_to_cart_product_id !== zarvel_get_design_deposit_product_id()
+    ) {
+        return;
+    }
+
+    zarvel_remove_design_deposits_from_cart();
+}, 10);
+
 add_filter('woocommerce_add_cart_item_data', function ($cart_item_data, $product_id) {
     $design_request_id = isset($_GET['zc_design_request']) ? absint(wp_unslash($_GET['zc_design_request'])) : 0;
 
     if (
         !$design_request_id ||
-        get_post_type($design_request_id) !== 'zarvel_design_request' ||
+        get_post_type($design_request_id) !== ZARVEL_DESIGN_REQUEST_TYPE ||
         $product_id !== zarvel_get_design_deposit_product_id()
     ) {
         return $cart_item_data;
     }
 
     $cart_item_data['zc_design_deposit_request_id'] = $design_request_id;
+    $cart_item_data['zc_design_deposit_amount'] = zarvel_get_design_request_deposit_amount($design_request_id);
 
     return $cart_item_data;
 }, 10, 2);
+
+add_action('woocommerce_before_calculate_totals', function ($cart) {
+    if (is_admin() && !defined('DOING_AJAX')) {
+        return;
+    }
+
+    $deposit_product_id = zarvel_get_design_deposit_product_id();
+
+    if (!$deposit_product_id || !$cart) {
+        return;
+    }
+
+    $kept_deposit_key = '';
+
+    foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+        if (
+            empty($cart_item['product_id']) ||
+            (int) $cart_item['product_id'] !== $deposit_product_id ||
+            empty($cart_item['data'])
+        ) {
+            continue;
+        }
+
+        if ($kept_deposit_key) {
+            $cart->remove_cart_item($cart_item_key);
+            continue;
+        }
+
+        $kept_deposit_key = $cart_item_key;
+        $deposit_amount = zarvel_get_design_request_deposit_amount(
+            !empty($cart_item['zc_design_deposit_request_id'])
+                ? absint($cart_item['zc_design_deposit_request_id'])
+                : 0
+        );
+
+        $cart_item['data']->set_price($deposit_amount);
+    }
+}, 20);
 
 function zarvel_cart_has_design_deposit() {
     if (!function_exists('WC') || !WC()->cart) {
@@ -122,6 +223,65 @@ function zarvel_cart_has_design_deposit() {
 
     return false;
 }
+
+function zarvel_cart_has_non_deposit_product() {
+    if (!function_exists('WC') || !WC()->cart) {
+        return false;
+    }
+
+    $deposit_product_id = zarvel_get_design_deposit_product_id();
+
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        if (empty($cart_item['product_id']) || (int) $cart_item['product_id'] !== $deposit_product_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function zarvel_is_local_storefront() {
+    return
+        (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local') ||
+        strpos((string) home_url('/'), '.local') !== false ||
+        strpos((string) home_url('/'), 'localhost') !== false;
+}
+
+function zarvel_order_has_design_deposit($order) {
+    if (!$order || !is_a($order, 'WC_Order')) {
+        return false;
+    }
+
+    $deposit_product_id = zarvel_get_design_deposit_product_id();
+
+    foreach ($order->get_items() as $item) {
+        if ((int) $item->get_product_id() === $deposit_product_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+add_filter('woocommerce_bacs_process_payment_order_status', function ($status, $order) {
+    if (zarvel_is_local_storefront() && zarvel_order_has_design_deposit($order)) {
+        return 'completed';
+    }
+
+    return $status;
+}, 20, 2);
+
+add_action('woocommerce_thankyou_bacs', function ($order_id) {
+    if (!zarvel_is_local_storefront() || !function_exists('wc_get_order')) {
+        return;
+    }
+
+    $order = wc_get_order($order_id);
+
+    if ($order && !$order->is_paid() && zarvel_order_has_design_deposit($order)) {
+        $order->payment_complete('local-design-deposit-test');
+    }
+}, 1);
 
 function zarvel_get_private_product_customer_email($product_id) {
     return strtolower(sanitize_email((string) get_post_meta($product_id, '_zarvel_private_customer_email', true)));
@@ -395,6 +555,14 @@ add_filter('pre_transient_wc_shipping_method_count', function ($pre) {
 add_filter('woocommerce_product_needs_shipping', function ($needs_shipping, $product) {
     if (
         is_object($product) &&
+        method_exists($product, 'get_id') &&
+        (int) $product->get_id() === zarvel_get_design_deposit_product_id()
+    ) {
+        return false;
+    }
+
+    if (
+        is_object($product) &&
         method_exists($product, 'get_type') &&
         in_array($product->get_type(), array('simple', 'variable', 'variation'), true)
     ) {
@@ -406,6 +574,10 @@ add_filter('woocommerce_product_needs_shipping', function ($needs_shipping, $pro
 
 add_filter('woocommerce_cart_needs_shipping', function ($needs_shipping) {
     if (function_exists('WC') && WC()->cart && !WC()->cart->is_empty()) {
+        if (zarvel_cart_has_design_deposit() && !zarvel_cart_has_non_deposit_product()) {
+            return false;
+        }
+
         return true;
     }
 
@@ -775,7 +947,7 @@ add_action('woocommerce_checkout_order_processed', function ($order_id, $posted_
             $design_request_id = absint(ltrim($request_meta, '#'));
         }
 
-        if (!$design_request_id || get_post_type($design_request_id) !== 'zarvel_design_request') {
+        if (!$design_request_id || get_post_type($design_request_id) !== ZARVEL_DESIGN_REQUEST_TYPE) {
             continue;
         }
 

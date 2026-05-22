@@ -472,6 +472,12 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
   </div>
 </section>
 
+<?php
+$zc_portal_design_email = function_exists('zarvel_portal_current_customer_email')
+  ? zarvel_portal_current_customer_email()
+  : '';
+$zc_portal_design_auth_enabled = function_exists('zarvel_portal_current_customer_email');
+?>
 <div class="zc-design-modal" data-zc-design-modal aria-hidden="true">
   <button class="zc-design-modal__overlay" type="button" data-zc-design-modal-close aria-label="Close design form"></button>
 
@@ -494,6 +500,7 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
       <input type="hidden" name="zarvel_customize_form_submit" value="1">
       <input type="hidden" name="zc_product_form_submission" value="1">
       <input type="hidden" name="zc_product_id" value="<?php echo esc_attr($product->get_id()); ?>">
+      <input type="hidden" name="zc_variation_id" data-zc-design-variation-id value="">
       <input type="hidden" name="selected_options" data-zc-design-selected-options value="">
 
       <div class="zc-design-modal__selected">
@@ -510,7 +517,7 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
 
         <label>
           <span>Email Address *</span>
-          <input type="email" name="email" placeholder="Enter your email address" required>
+          <input type="email" name="email" placeholder="name@gmail.com" value="<?php echo esc_attr($zc_portal_design_email); ?>" <?php echo $zc_portal_design_email ? 'readonly' : ''; ?> required>
         </label>
 
         <label>
@@ -553,6 +560,20 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
         <textarea name="design_notes" rows="5" placeholder="Tell us about your design idea, placement, style, and anything important..." required></textarea>
       </label>
 
+      <?php if ($zc_portal_design_auth_enabled) : ?>
+        <div class="zc-design-modal__auth <?php echo $zc_portal_design_email ? 'is-verified' : ''; ?>" data-zc-design-auth>
+          <?php if ($zc_portal_design_email) : ?>
+            <strong data-zc-design-auth-message>Logged in as <?php echo esc_html($zc_portal_design_email); ?>.</strong>
+          <?php else : ?>
+            <strong data-zc-design-auth-message>Confirm your Gmail to send this design request.</strong>
+          <?php endif; ?>
+          <label data-zc-design-code-wrap hidden>
+            <span>Gmail Code</span>
+            <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" data-zc-design-code placeholder="6-digit code">
+          </label>
+        </div>
+      <?php endif; ?>
+
       <button type="submit" class="zc-design-modal__submit">Submit Design Form</button>
     </form>
   </div>
@@ -567,6 +588,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const defaultGallery = <?php echo wp_json_encode($initial_gallery_images); ?>;
   const zcDesignFormUrl = <?php echo wp_json_encode($zc_design_form_url); ?>;
   const zcCurrentProductId = <?php echo wp_json_encode($product->get_id()); ?>;
+  const zcPortalDesignAuth = <?php echo wp_json_encode(array(
+    'enabled' => $zc_portal_design_auth_enabled,
+    'loggedEmail' => $zc_portal_design_email,
+    'ajaxUrl' => admin_url('admin-ajax.php'),
+    'nonce' => wp_create_nonce('zarvel_portal_design_modal'),
+  )); ?>;
   let zcVariationGalleryWasRendered = false;
 
   function normalizeColorName(colorName) {
@@ -882,13 +909,22 @@ document.addEventListener('DOMContentLoaded', function () {
   function initZcSendDesignRequestToForm() {
     const formArea = document.querySelector('[data-zc-product-form-area]');
     const designModal = document.querySelector('[data-zc-design-modal]');
+    const designRequestForm = designModal ? designModal.querySelector('.zc-design-modal__form') : null;
     const designModalSummary = document.querySelector('[data-zc-design-selected-summary]');
     const designModalOptionsInput = document.querySelector('[data-zc-design-selected-options]');
+    const designModalVariationInput = document.querySelector('[data-zc-design-variation-id]');
+    const designAuth = document.querySelector('[data-zc-design-auth]');
+    const designAuthMessage = document.querySelector('[data-zc-design-auth-message]');
+    const designAuthCodeWrap = document.querySelector('[data-zc-design-code-wrap]');
+    const designAuthCodeInput = document.querySelector('[data-zc-design-code]');
     const designModalCloseButtons = document.querySelectorAll('[data-zc-design-modal-close]');
     const placementSelect = document.querySelector('[data-zc-placement-select]');
     const placementCostNote = document.querySelector('[data-zc-placement-cost-note]');
     const placementExtraCostInput = document.querySelector('[data-zc-placement-extra-cost]');
     const placementExtraLabelInput = document.querySelector('[data-zc-placement-extra-label]');
+    let designAuthCodeEmail = '';
+    let designAuthCodeSent = false;
+    let designAuthVerified = !!(zcPortalDesignAuth && zcPortalDesignAuth.loggedEmail);
 
     if (!formArea) return;
 
@@ -1002,6 +1038,10 @@ document.addEventListener('DOMContentLoaded', function () {
         designModalOptionsInput.value = selectedOptionsText;
       }
 
+      if (designModalVariationInput) {
+        designModalVariationInput.value = variationId && variationId !== '0' ? variationId : '';
+      }
+
       if (designModalSummary) {
         designModalSummary.textContent = selectedOptionsText;
       }
@@ -1056,6 +1096,126 @@ document.addEventListener('DOMContentLoaded', function () {
       if (placementExtraLabelInput) {
         placementExtraLabelInput.value = extraLabel;
       }
+    }
+
+    function setDesignAuthMessage(message, state) {
+      if (!designAuthMessage) return;
+
+      designAuthMessage.textContent = message;
+
+      if (designAuth) {
+        designAuth.classList.remove('is-error', 'is-pending', 'is-verified');
+        if (state) designAuth.classList.add(state);
+      }
+    }
+
+    function setDesignSubmitBusy(button, busy) {
+      if (!button) return;
+
+      button.disabled = busy;
+      button.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+
+    function callDesignAuth(action, email, code) {
+      const body = new FormData();
+      body.append('action', action);
+      body.append('nonce', zcPortalDesignAuth.nonce);
+      body.append('email', email);
+
+      if (code) {
+        body.append('code', code);
+      }
+
+      return fetch(zcPortalDesignAuth.ajaxUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: body
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data.success) {
+            throw new Error(data && data.data && data.data.message ? data.data.message : 'Please try again.');
+          }
+
+          return data.data || {};
+        });
+      });
+    }
+
+    if (designRequestForm && zcPortalDesignAuth && zcPortalDesignAuth.enabled) {
+      const emailInput = designRequestForm.querySelector('input[name="email"]');
+      const submitButton = designRequestForm.querySelector('.zc-design-modal__submit');
+
+      if (emailInput && !designAuthVerified) {
+        emailInput.addEventListener('input', function () {
+          if (designAuthCodeEmail === emailInput.value.trim().toLowerCase()) return;
+
+          designAuthCodeSent = false;
+          designAuthCodeEmail = '';
+
+          if (designAuthCodeWrap) designAuthCodeWrap.hidden = true;
+          if (designAuthCodeInput) designAuthCodeInput.value = '';
+          if (submitButton) submitButton.textContent = 'Submit Design Form';
+        });
+      }
+
+      designRequestForm.addEventListener('submit', function (event) {
+        if (designAuthVerified) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (!designRequestForm.reportValidity()) {
+          return;
+        }
+
+        const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+
+        setDesignSubmitBusy(submitButton, true);
+
+        if (!designAuthCodeSent || designAuthCodeEmail !== email) {
+          callDesignAuth('zarvel_portal_modal_send_code', email)
+            .then(function (data) {
+              designAuthCodeSent = true;
+              designAuthCodeEmail = email;
+              if (designAuthCodeWrap) designAuthCodeWrap.hidden = false;
+              if (submitButton) submitButton.textContent = 'Verify Code And Submit';
+              setDesignAuthMessage(data.message || 'Code sent. Check your Gmail.', 'is-pending');
+              if (designAuthCodeInput) designAuthCodeInput.focus();
+            })
+            .catch(function (error) {
+              setDesignAuthMessage(error.message, 'is-error');
+            })
+            .finally(function () {
+              setDesignSubmitBusy(submitButton, false);
+            });
+          return;
+        }
+
+        const code = designAuthCodeInput ? designAuthCodeInput.value.trim() : '';
+
+        if (!/^[0-9]{6}$/.test(code)) {
+          setDesignAuthMessage('Enter the 6-digit Gmail code.', 'is-error');
+          if (designAuthCodeInput) designAuthCodeInput.focus();
+          setDesignSubmitBusy(submitButton, false);
+          return;
+        }
+
+        callDesignAuth('zarvel_portal_modal_verify_code', email, code)
+          .then(function (data) {
+            designAuthVerified = true;
+            if (emailInput) {
+              emailInput.value = data.email || email;
+              emailInput.readOnly = true;
+            }
+            setDesignAuthMessage(data.message || 'You are logged in.', 'is-verified');
+            designRequestForm.submit();
+          })
+          .catch(function (error) {
+            setDesignAuthMessage(error.message, 'is-error');
+            setDesignSubmitBusy(submitButton, false);
+          });
+      });
     }
 
     keepDesignRequestButtonsClickable();
@@ -2003,6 +2163,37 @@ document.addEventListener('DOMContentLoaded', function () {
   font-weight: 750;
 }
 
+.zc-design-modal__auth {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #eeeeee;
+  border-radius: 6px;
+  background: #fafafa;
+  display: grid;
+  gap: 12px;
+}
+
+.zc-design-modal__auth strong {
+  color: #111111;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.zc-design-modal__auth.is-pending {
+  border-color: #f0d38b;
+  background: #fff8e8;
+}
+
+.zc-design-modal__auth.is-verified {
+  border-color: #b9dfc4;
+  background: #eefbf2;
+}
+
+.zc-design-modal__auth.is-error {
+  border-color: #f2b7aa;
+  background: #fff0ed;
+}
+
 .zc-design-modal__submit {
   width: 100%;
   min-height: 50px;
@@ -2015,6 +2206,11 @@ document.addEventListener('DOMContentLoaded', function () {
   font-weight: 950;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.zc-design-modal__submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .zc-design-modal__submit:hover {

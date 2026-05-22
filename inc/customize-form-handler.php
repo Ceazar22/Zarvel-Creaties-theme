@@ -1,6 +1,10 @@
 <?php
 defined('ABSPATH') || exit;
 
+if (!defined('ZARVEL_DESIGN_REQUEST_TYPE')) {
+    define('ZARVEL_DESIGN_REQUEST_TYPE', 'zarvel_design_req');
+}
+
 /**
  * Save a local copy so LocalWP submissions still work when wp_mail is not configured.
  */
@@ -38,7 +42,7 @@ function zarvel_save_customize_form_submission($subject, $message, $attachments 
  * Keep design requests visible in wp-admin even when server email is blocked.
  */
 function zarvel_register_design_request_post_type() {
-    register_post_type('zarvel_design_request', array(
+    register_post_type(ZARVEL_DESIGN_REQUEST_TYPE, array(
         'labels' => array(
             'name'          => 'Design Requests',
             'singular_name' => 'Design Request',
@@ -54,9 +58,115 @@ function zarvel_register_design_request_post_type() {
 }
 add_action('init', 'zarvel_register_design_request_post_type');
 
+function zarvel_design_request_payment_badge($request_id) {
+    $order_id = absint(get_post_meta($request_id, '_design_deposit_order_id', true));
+
+    if (!$order_id || !function_exists('wc_get_order')) {
+        return array(
+            'label' => 'Not Paid',
+            'class' => 'is-unpaid',
+            'order' => null,
+        );
+    }
+
+    $order = wc_get_order($order_id);
+
+    if (!$order) {
+        return array(
+            'label' => 'Not Paid',
+            'class' => 'is-unpaid',
+            'order' => null,
+        );
+    }
+
+    if ($order->is_paid()) {
+        return array(
+            'label' => 'Paid',
+            'class' => 'is-paid',
+            'order' => $order,
+        );
+    }
+
+    return array(
+        'label' => 'Awaiting Payment',
+        'class' => 'is-pending',
+        'order' => $order,
+    );
+}
+
+add_filter('manage_' . ZARVEL_DESIGN_REQUEST_TYPE . '_posts_columns', function ($columns) {
+    $payment_columns = array();
+
+    foreach ($columns as $key => $label) {
+        $payment_columns[$key] = $label;
+
+        if ($key === 'title') {
+            $payment_columns['zarvel_deposit_payment'] = 'Deposit Payment';
+        }
+    }
+
+    $payment_columns['zarvel_remove_request'] = 'Remove';
+
+    return $payment_columns;
+});
+
+add_action('manage_' . ZARVEL_DESIGN_REQUEST_TYPE . '_posts_custom_column', function ($column, $request_id) {
+    if ($column === 'zarvel_remove_request') {
+        $remove_url = get_delete_post_link($request_id);
+
+        if ($remove_url && current_user_can('delete_post', $request_id)) {
+            ?>
+            <a class="button-link-delete zarvel-design-remove" href="<?php echo esc_url($remove_url); ?>">
+                <?php esc_html_e('Remove', 'zarvel-creative'); ?>
+            </a>
+            <?php
+        }
+
+        return;
+    }
+
+    if ($column !== 'zarvel_deposit_payment') {
+        return;
+    }
+
+    $payment = zarvel_design_request_payment_badge($request_id);
+    $order = $payment['order'];
+    ?>
+    <span class="zarvel-design-payment <?php echo esc_attr($payment['class']); ?>">
+        <?php echo esc_html($payment['label']); ?>
+    </span>
+    <?php if ($order && current_user_can('edit_shop_orders')) : ?>
+        <div>
+            <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">
+                <?php echo esc_html('#' . $order->get_order_number()); ?>
+            </a>
+        </div>
+    <?php endif; ?>
+    <?php
+}, 10, 2);
+
+add_action('admin_head-edit.php', function () {
+    $screen = get_current_screen();
+
+    if (!$screen || $screen->post_type !== ZARVEL_DESIGN_REQUEST_TYPE) {
+        return;
+    }
+    ?>
+    <style>
+        .column-zarvel_deposit_payment { width: 180px; }
+        .column-zarvel_remove_request { width: 100px; }
+        .zarvel-design-payment { display: inline-flex; min-height: 24px; align-items: center; padding: 0 9px; border-radius: 999px; background: #f0f0f1; color: #1d2327; font-weight: 600; }
+        .zarvel-design-payment.is-paid { background: #dff5e5; color: #075b24; }
+        .zarvel-design-payment.is-pending { background: #fff1cf; color: #6f4b00; }
+        .zarvel-design-payment.is-unpaid { background: #fde2e2; color: #8a1111; }
+        .zarvel-design-remove { font-weight: 600; }
+    </style>
+    <?php
+});
+
 function zarvel_save_customize_form_admin_post($subject, $message, $fields = array(), $attachments = array()) {
     $post_id = wp_insert_post(array(
-        'post_type'    => 'zarvel_design_request',
+        'post_type'    => ZARVEL_DESIGN_REQUEST_TYPE,
         'post_status'  => 'private',
         'post_title'   => $subject,
         'post_content' => $message,
@@ -151,6 +261,7 @@ function zarvel_handle_customize_form() {
     $print_location_extra_cost = isset($_POST['print_location_extra_cost']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_cost'])) : '0';
     $print_location_extra_label = isset($_POST['print_location_extra_label']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_label'])) : '';
     $selected_product_id = isset($_POST['zc_product_id']) ? absint($_POST['zc_product_id']) : 0;
+    $selected_variation_id = isset($_POST['zc_variation_id']) ? absint($_POST['zc_variation_id']) : 0;
     $selected_product_name = '';
 
     if ($selected_product_id && function_exists('wc_get_product')) {
@@ -158,6 +269,16 @@ function zarvel_handle_customize_form() {
 
         if ($selected_product) {
             $selected_product_name = $selected_product->get_name();
+        }
+
+        $selected_variation = $selected_variation_id ? wc_get_product($selected_variation_id) : null;
+
+        if (
+            !$selected_variation ||
+            !$selected_variation->is_type('variation') ||
+            (int) $selected_variation->get_parent_id() !== $selected_product_id
+        ) {
+            $selected_variation_id = 0;
         }
     }
 
@@ -260,6 +381,15 @@ function zarvel_handle_customize_form() {
     if (!is_email($email)) {
         wp_safe_redirect(add_query_arg('request_status', 'invalid_email', $redirect_url));
         exit;
+    }
+
+    if ($is_product_form_submission && function_exists('zarvel_portal_current_customer_email')) {
+        $portal_email = strtolower(sanitize_email(zarvel_portal_current_customer_email()));
+
+        if (!$portal_email || strtolower($email) !== $portal_email) {
+            wp_safe_redirect(add_query_arg('request_status', 'login_required', $redirect_url));
+            exit;
+        }
     }
 
     /**
@@ -480,6 +610,7 @@ function zarvel_handle_customize_form() {
         'email'                 => $email,
         'phone'                 => $phone,
         'selected_product_id'   => $selected_product_id,
+        'selected_variation_id' => $selected_variation_id,
         'selected_product_name' => $selected_product_name,
         'selected_options'      => $selected_options,
         'product_type'          => $product_type_label,
