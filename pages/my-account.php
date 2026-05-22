@@ -8,15 +8,19 @@ get_header();
   <section class="zc-account-hero">
     <div class="zc-account-container">
       <p>Account</p>
-      <h1>Your orders and details.</h1>
-      <span>Sign in to check previous orders, update addresses, and manage your customer profile.</span>
+      <h1>Your private custom portal.</h1>
+      <span>Log in to see design requests and custom products shared only with your Zarvel account.</span>
     </div>
   </section>
 
   <section class="zc-account-shell">
     <div class="zc-account-container">
       <div class="zc-account-card">
-        <?php echo do_shortcode('[woocommerce_my_account]'); ?>
+        <?php if (shortcode_exists('zarvel_customer_portal')) : ?>
+          <?php echo do_shortcode('[zarvel_customer_portal]'); ?>
+        <?php else : ?>
+          <p>The Zarvel customer portal plugin must be active.</p>
+        <?php endif; ?>
       </div>
     </div>
   </section>
@@ -75,60 +79,6 @@ get_header();
   border-radius: 14px;
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.06);
   padding: 30px;
-}
-
-.zc-account-card .woocommerce {
-  font-family: inherit;
-}
-
-.zc-account-card .woocommerce-MyAccount-navigation ul {
-  list-style: none;
-  margin: 0 0 26px;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.zc-account-card .woocommerce-MyAccount-navigation a {
-  min-height: 42px;
-  border: 1px solid #dfdfdf;
-  border-radius: 999px;
-  padding: 0 16px;
-  color: #050505;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.zc-account-card .woocommerce-MyAccount-navigation .is-active a {
-  border-color: #050505;
-  background: #050505;
-  color: #ffffff;
-}
-
-.zc-account-card input.input-text,
-.zc-account-card textarea,
-.zc-account-card select {
-  min-height: 48px;
-  border: 1px solid #dcdcdc;
-  border-radius: 8px;
-  padding: 12px 14px;
-}
-
-.zc-account-card .button {
-  min-height: 50px;
-  border: 0;
-  border-radius: 8px;
-  padding: 0 24px;
-  background: #ff5b1a;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 950;
-  text-transform: uppercase;
 }
 
 @media (max-width: 640px) {

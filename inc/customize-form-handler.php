@@ -78,72 +78,6 @@ function zarvel_save_customize_form_admin_post($subject, $message, $fields = arr
 }
 
 /**
- * Add the product chosen before the product-page design form to the cart.
- */
-function zarvel_add_design_request_product_to_cart($product_id, $variation_id = 0, $quantity = 1, $design_request = array()) {
-    if (!$product_id || !function_exists('WC') || !function_exists('wc_get_product')) {
-        return false;
-    }
-
-    if (!WC()->cart && function_exists('wc_load_cart')) {
-        wc_load_cart();
-    }
-
-    if (!WC()->cart) {
-        return false;
-    }
-
-    $product = wc_get_product($product_id);
-
-    if (!$product || !$product->is_purchasable()) {
-        return false;
-    }
-
-    $variation_attributes = array();
-
-    if ($variation_id) {
-        $variation = wc_get_product($variation_id);
-
-        if (
-            !$variation ||
-            !$variation instanceof WC_Product_Variation ||
-            (int) $variation->get_parent_id() !== (int) $product_id
-        ) {
-            return false;
-        }
-
-        $variation_attributes = $variation->get_variation_attributes();
-    } elseif ($product->is_type('variable')) {
-        return false;
-    }
-
-    $cart_item_data = array(
-        'zc_custom_design'  => true,
-        'zc_design_request' => true,
-        'zc_design_details' => $design_request,
-        'zc_design_key'     => md5(wp_json_encode(array(
-            'product_id'   => $product_id,
-            'variation_id' => $variation_id,
-            'time'         => microtime(true),
-        ))),
-    );
-
-    $cart_item_key = WC()->cart->add_to_cart(
-        $product_id,
-        max(1, absint($quantity)),
-        $variation_id,
-        $variation_attributes,
-        $cart_item_data
-    );
-
-    if ($cart_item_key) {
-        WC()->cart->calculate_totals();
-    }
-
-    return $cart_item_key;
-}
-
-/**
  * Handle Design Details Form
  */
 function zarvel_handle_customize_form() {
@@ -217,11 +151,6 @@ function zarvel_handle_customize_form() {
     $print_location_extra_cost = isset($_POST['print_location_extra_cost']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_cost'])) : '0';
     $print_location_extra_label = isset($_POST['print_location_extra_label']) ? sanitize_text_field(wp_unslash($_POST['print_location_extra_label'])) : '';
     $selected_product_id = isset($_POST['zc_product_id']) ? absint($_POST['zc_product_id']) : 0;
-    $selected_variation_id = isset($_POST['zc_variation_id']) ? absint($_POST['zc_variation_id']) : 0;
-    $selected_quantity = isset($_POST['quantity']) ? max(1, absint($_POST['quantity'])) : 1;
-    $product_return_url = isset($_POST['zc_return_url'])
-        ? wp_validate_redirect(esc_url_raw(wp_unslash($_POST['zc_return_url'])), home_url('/'))
-        : home_url('/');
     $selected_product_name = '';
 
     if ($selected_product_id && function_exists('wc_get_product')) {
@@ -543,39 +472,6 @@ function zarvel_handle_customize_form() {
         }
     }
 
-    if ($is_product_form_submission) {
-        $cart_item_key = zarvel_add_design_request_product_to_cart(
-            $selected_product_id,
-            $selected_variation_id,
-            $selected_quantity,
-            array(
-                'full_name'                  => $full_name,
-                'email'                      => $email,
-                'phone'                      => $phone,
-                'product_type'               => $product_type_label,
-                'print_location'             => $print_location_label,
-                'print_location_extra_cost'  => $print_location_extra_cost,
-                'print_location_extra_label' => $print_location_extra_label,
-                'logo_status'                => $logo_status_label,
-                'design_text'                => $design_text,
-                'preferred_colors'           => $preferred_colors,
-                'design_notes'               => $design_notes,
-                'selected_options'           => $selected_options,
-                'uploaded_files'             => $attachments,
-            )
-        );
-
-        if ($cart_item_key) {
-            $sidecart_url = add_query_arg('zc_open_cart', '1', $product_return_url);
-
-            wp_safe_redirect($sidecart_url);
-            exit;
-        }
-
-        wp_safe_redirect(add_query_arg('request_status', 'cart_error', $redirect_url));
-        exit;
-    }
-
     /**
      * Send email.
      */
@@ -593,6 +489,7 @@ function zarvel_handle_customize_form() {
         'logo_status'           => $logo_status_label,
         'design_text'           => $design_text,
         'preferred_colors'      => $preferred_colors,
+        'design_notes'          => $design_notes,
     ), $attachments);
 
     $sent = wp_mail($recipient, $subject, $message, $headers, $attachments);
@@ -610,6 +507,17 @@ function zarvel_handle_customize_form() {
     }
 
     if ($sent || $saved_locally || $admin_post_id) {
+        if ($is_product_form_submission) {
+            $thank_you_url = home_url('/design-request-thank-you/');
+
+            if ($admin_post_id) {
+                $thank_you_url = add_query_arg('design_request', $admin_post_id, $thank_you_url);
+            }
+
+            wp_safe_redirect($thank_you_url);
+            exit;
+        }
+
         wp_safe_redirect(add_query_arg('request_status', 'success', $redirect_url));
         exit;
     }

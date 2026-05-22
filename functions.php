@@ -33,6 +33,217 @@ add_filter('woocommerce_currency', function ($currency) {
     return 'USD';
 }, 20);
 
+if (!defined('ZARVEL_DESIGN_DEPOSIT_AMOUNT')) {
+    define('ZARVEL_DESIGN_DEPOSIT_AMOUNT', '15');
+}
+
+/**
+ * Keep a checkout-ready design deposit service available for request follow-up.
+ */
+function zarvel_get_design_deposit_product_id() {
+    if (!function_exists('wc_get_product_id_by_sku') || !class_exists('WC_Product_Simple')) {
+        return 0;
+    }
+
+    $product_id = (int) wc_get_product_id_by_sku('zarvel-design-deposit');
+
+    if ($product_id) {
+        return $product_id;
+    }
+
+    $deposit = new WC_Product_Simple();
+    $deposit->set_name(__('Design Deposit', 'zarvel-creative'));
+    $deposit->set_slug('design-deposit');
+    $deposit->set_sku('zarvel-design-deposit');
+    $deposit->set_status('publish');
+    $deposit->set_catalog_visibility('hidden');
+    $deposit->set_virtual(true);
+    $deposit->set_sold_individually(true);
+    $deposit->set_regular_price(ZARVEL_DESIGN_DEPOSIT_AMOUNT);
+    $deposit->set_price(ZARVEL_DESIGN_DEPOSIT_AMOUNT);
+    $deposit->set_short_description(__('Pays the design deposit so Zarvel Creatives can begin reviewing a custom design request.', 'zarvel-creative'));
+    $deposit->set_description(__('This deposit starts the design review for a custom product request. Final product pricing is handled after the approved design and product details are ready.', 'zarvel-creative'));
+
+    return (int) $deposit->save();
+}
+
+function zarvel_get_design_deposit_checkout_url($design_request_id = 0) {
+    $product_id = zarvel_get_design_deposit_product_id();
+
+    if (!$product_id) {
+        return home_url('/contact/');
+    }
+
+    $checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout/');
+
+    $checkout_args = array(
+        'add-to-cart' => $product_id,
+    );
+
+    if ($design_request_id && get_post_type($design_request_id) === 'zarvel_design_request') {
+        $checkout_args['zc_design_request'] = $design_request_id;
+    }
+
+    return add_query_arg($checkout_args, $checkout_url);
+}
+
+add_filter('woocommerce_add_cart_item_data', function ($cart_item_data, $product_id) {
+    $design_request_id = isset($_GET['zc_design_request']) ? absint(wp_unslash($_GET['zc_design_request'])) : 0;
+
+    if (
+        !$design_request_id ||
+        get_post_type($design_request_id) !== 'zarvel_design_request' ||
+        $product_id !== zarvel_get_design_deposit_product_id()
+    ) {
+        return $cart_item_data;
+    }
+
+    $cart_item_data['zc_design_deposit_request_id'] = $design_request_id;
+
+    return $cart_item_data;
+}, 10, 2);
+
+function zarvel_cart_has_design_deposit() {
+    if (!function_exists('WC') || !WC()->cart) {
+        return false;
+    }
+
+    $deposit_product_id = zarvel_get_design_deposit_product_id();
+
+    if (!$deposit_product_id) {
+        return false;
+    }
+
+    foreach (WC()->cart->get_cart() as $cart_item) {
+        if (!empty($cart_item['product_id']) && (int) $cart_item['product_id'] === $deposit_product_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function zarvel_get_private_product_customer_email($product_id) {
+    return strtolower(sanitize_email((string) get_post_meta($product_id, '_zarvel_private_customer_email', true)));
+}
+
+function zarvel_is_private_product_customer($product_id) {
+    $customer_email = zarvel_get_private_product_customer_email($product_id);
+    $portal_email = function_exists('zarvel_portal_current_customer_email')
+        ? zarvel_portal_current_customer_email()
+        : '';
+
+    if (!$customer_email || !$portal_email) {
+        return false;
+    }
+
+    return strtolower($customer_email) === strtolower($portal_email);
+}
+
+/**
+ * Assign a custom WooCommerce product to one account by email.
+ */
+add_action('add_meta_boxes_product', function () {
+    add_meta_box(
+        'zarvel-private-customer-product',
+        __('Zarvel Private Customer Product', 'zarvel-creative'),
+        function ($post) {
+            $customer_email = zarvel_get_private_product_customer_email($post->ID);
+            wp_nonce_field('zarvel_save_private_customer_product', 'zarvel_private_customer_product_nonce');
+            ?>
+            <p>
+                <label for="zarvel-private-customer-email">
+                    <?php esc_html_e('Customer account email', 'zarvel-creative'); ?>
+                </label>
+            </p>
+            <input
+                id="zarvel-private-customer-email"
+                class="widefat"
+                type="email"
+                name="zarvel_private_customer_email"
+                value="<?php echo esc_attr($customer_email); ?>"
+                placeholder="customer@example.com"
+            >
+            <p class="description">
+                <?php esc_html_e('When this is set, only that logged-in customer and shop admins can open or buy this product.', 'zarvel-creative'); ?>
+            </p>
+            <?php
+        },
+        'product',
+        'side',
+        'default'
+    );
+});
+
+add_action('save_post_product', function ($post_id) {
+    if (
+        empty($_POST['zarvel_private_customer_product_nonce']) ||
+        !wp_verify_nonce(
+            sanitize_text_field(wp_unslash($_POST['zarvel_private_customer_product_nonce'])),
+            'zarvel_save_private_customer_product'
+        ) ||
+        (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) ||
+        !current_user_can('edit_post', $post_id)
+    ) {
+        return;
+    }
+
+    $customer_email = isset($_POST['zarvel_private_customer_email'])
+        ? strtolower(sanitize_email(wp_unslash($_POST['zarvel_private_customer_email'])))
+        : '';
+
+    if ($customer_email) {
+        update_post_meta($post_id, '_zarvel_private_customer_email', $customer_email);
+        return;
+    }
+
+    delete_post_meta($post_id, '_zarvel_private_customer_email');
+});
+
+add_filter('woocommerce_product_is_visible', function ($visible, $product_id) {
+    return zarvel_get_private_product_customer_email($product_id) ? false : $visible;
+}, 20, 2);
+
+add_action('template_redirect', function () {
+    if (!function_exists('is_product') || !is_product() || current_user_can('manage_woocommerce')) {
+        return;
+    }
+
+    $product_id = get_queried_object_id();
+
+    if (!$product_id || !zarvel_get_private_product_customer_email($product_id)) {
+        return;
+    }
+
+    if (zarvel_is_private_product_customer($product_id)) {
+        return;
+    }
+
+    if (!function_exists('zarvel_portal_current_customer_email') || !zarvel_portal_current_customer_email()) {
+        wp_safe_redirect(add_query_arg('redirect_to', get_permalink($product_id), home_url('/my-account/')));
+        exit;
+    }
+
+    global $wp_query;
+    $wp_query->set_404();
+    status_header(404);
+    nocache_headers();
+});
+
+add_filter('woocommerce_add_to_cart_validation', function ($passed, $product_id) {
+    if (
+        current_user_can('manage_woocommerce') ||
+        !zarvel_get_private_product_customer_email($product_id) ||
+        zarvel_is_private_product_customer($product_id)
+    ) {
+        return $passed;
+    }
+
+    wc_add_notice(__('This custom product is available only in the assigned customer account.', 'zarvel-creative'), 'error');
+
+    return false;
+}, 20, 2);
+
 /**
  * Get real WooCommerce product categories for theme navigation.
  */
@@ -137,11 +348,7 @@ function zarvel_refresh_cart_totals() {
     }
 
     WC()->cart->calculate_shipping();
-    if (WC()->cart->is_empty()) {
-        WC()->cart->calculate_totals();
-    } else {
-        zarvel_refresh_cart_totals();
-    }
+    WC()->cart->calculate_totals();
 }
 
 add_action('woocommerce_shipping_init', function () {
@@ -526,6 +733,14 @@ add_action('wp_ajax_nopriv_zc_customizer_add_to_cart', 'zarvel_customizer_add_to
  * Persist custom design summary on checkout/order line items.
  */
 add_action('woocommerce_checkout_create_order_line_item', function ($item, $cart_item_key, $values) {
+    if (!empty($values['zc_design_deposit_request_id'])) {
+        $item->add_meta_data('_zc_design_request_id', absint($values['zc_design_deposit_request_id']), true);
+        $item->add_meta_data(
+            __('Design request', 'zarvel-creative'),
+            '#' . absint($values['zc_design_deposit_request_id'])
+        );
+    }
+
     if (empty($values['zc_custom_design'])) {
         return;
     }
@@ -542,38 +757,30 @@ add_action('woocommerce_checkout_create_order_line_item', function ($item, $cart
         $item->add_meta_data(__('Imprint size', 'zarvel-creative'), $values['zc_imprint_size']);
     }
 
-    if (empty($values['zc_design_request']) || empty($values['zc_design_details']) || !is_array($values['zc_design_details'])) {
+}, 10, 3);
+
+/**
+ * Link a paid design deposit back to its saved request and checkout account.
+ */
+add_action('woocommerce_checkout_order_processed', function ($order_id, $posted_data, $order) {
+    if (!$order || !is_a($order, 'WC_Order')) {
         return;
     }
 
-    $details = $values['zc_design_details'];
-    $item->add_meta_data(__('Design help requested', 'zarvel-creative'), __('Yes', 'zarvel-creative'));
+    foreach ($order->get_items() as $item) {
+        $design_request_id = absint($item->get_meta('_zc_design_request_id', true));
 
-    $detail_labels = array(
-        'full_name'                  => __('Design contact name', 'zarvel-creative'),
-        'email'                      => __('Design contact email', 'zarvel-creative'),
-        'phone'                      => __('Design contact phone', 'zarvel-creative'),
-        'product_type'               => __('Requested product type', 'zarvel-creative'),
-        'print_location'             => __('Print placement', 'zarvel-creative'),
-        'print_location_extra_cost'  => __('Placement extra cost', 'zarvel-creative'),
-        'print_location_extra_label' => __('Placement cost note', 'zarvel-creative'),
-        'logo_status'                => __('Logo status', 'zarvel-creative'),
-        'design_text'                => __('Design text', 'zarvel-creative'),
-        'preferred_colors'           => __('Preferred colors', 'zarvel-creative'),
-        'design_notes'               => __('Design instructions', 'zarvel-creative'),
-        'selected_options'           => __('Selected options', 'zarvel-creative'),
-    );
-
-    foreach ($detail_labels as $detail_key => $detail_label) {
-        if (!empty($details[$detail_key])) {
-            $item->add_meta_data($detail_label, sanitize_textarea_field((string) $details[$detail_key]));
+        if (!$design_request_id) {
+            $request_meta = (string) $item->get_meta(__('Design request', 'zarvel-creative'), true);
+            $design_request_id = absint(ltrim($request_meta, '#'));
         }
-    }
 
-    if (!empty($details['uploaded_files']) && is_array($details['uploaded_files'])) {
-        $item->add_meta_data(
-            __('Uploaded design files', 'zarvel-creative'),
-            implode("\n", array_map('sanitize_text_field', $details['uploaded_files']))
-        );
+        if (!$design_request_id || get_post_type($design_request_id) !== 'zarvel_design_request') {
+            continue;
+        }
+
+        update_post_meta($design_request_id, '_design_deposit_order_id', $order_id);
+        update_post_meta($design_request_id, '_customer_user_id', $order->get_customer_id());
+        update_post_meta($design_request_id, '_customer_email', sanitize_email($order->get_billing_email()));
     }
-}, 10, 3);
+}, 20, 3);

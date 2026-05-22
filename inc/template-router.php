@@ -60,6 +60,7 @@ function zarvel_get_theme_only_route_template($current_path) {
 
     $routes = array(
         'customize'       => $theme_dir . '/pages/customize.php',
+        'design-request-thank-you' => $theme_dir . '/pages/design-request-thank-you.php',
         'our-services'    => $theme_dir . '/pages/our-services.php',
         'about-us'        => $theme_dir . '/pages/about-us.php',
         'contact'         => $theme_dir . '/pages/contact.php',
@@ -166,6 +167,7 @@ function zarvel_custom_template_router($template) {
     $single_product_template   = $theme_dir . '/pages/single-product.php';
     $product_category_template = $theme_dir . '/pages/product-category.php';
     $customize_template        = $theme_dir . '/pages/customize.php';
+    $design_request_thank_you_template = $theme_dir . '/pages/design-request-thank-you.php';
     $services_template         = $theme_dir . '/pages/our-services.php';
     $about_template            = $theme_dir . '/pages/about-us.php';
     $contact_template          = $theme_dir . '/pages/contact.php';
@@ -197,6 +199,15 @@ function zarvel_custom_template_router($template) {
     if ($current_path === 'customize' && file_exists($customize_template)) {
         zarvel_prepare_theme_only_page();
         return $customize_template;
+    }
+
+    /**
+     * Product design request next step page.
+     * URL: /design-request-thank-you/
+     */
+    if ($current_path === 'design-request-thank-you' && file_exists($design_request_thank_you_template)) {
+        zarvel_prepare_theme_only_page();
+        return $design_request_thank_you_template;
     }
 
     /**

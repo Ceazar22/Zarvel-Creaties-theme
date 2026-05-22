@@ -51,10 +51,6 @@ defined('ABSPATH') || exit;
         <div class="zc-form-message zc-form-message--error">
           Message failed to send. Please try again.
         </div>
-      <?php elseif ($request_status === 'cart_error') : ?>
-        <div class="zc-form-message zc-form-message--error">
-          Your design form was saved, but the selected product could not be added to cart. Return to the product and choose its options again.
-        </div>
       <?php elseif ($request_status === 'missing_fields') : ?>
         <div class="zc-form-message zc-form-message--error">
           Please fill in all required fields.

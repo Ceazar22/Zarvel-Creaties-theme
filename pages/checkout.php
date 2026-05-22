@@ -72,9 +72,7 @@ if (function_exists('WC') && WC()->cart) {
 
                 <div>
                   <h3><?php echo esc_html($product->get_name()); ?></h3>
-                  <?php if (!empty($cart_item['zc_design_request'])) : ?>
-                    <p>Design help requested</p>
-                  <?php elseif (!empty($cart_item['zc_custom_design'])) : ?>
+                  <?php if (!empty($cart_item['zc_custom_design'])) : ?>
                     <p>Custom design</p>
                   <?php endif; ?>
                 </div>

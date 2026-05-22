@@ -176,10 +176,6 @@ $zc_cart_url = function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url
 $zc_checkout_url = function_exists('wc_get_checkout_url') ? wc_get_checkout_url() : home_url('/checkout');
 
 if (function_exists('WC') && WC()->cart) {
-  if (function_exists('zarvel_refresh_cart_totals')) {
-    zarvel_refresh_cart_totals();
-  }
-
   $zc_cart_count = WC()->cart->get_cart_contents_count();
   $zc_cart_subtotal = (float) WC()->cart->get_subtotal();
   $zc_cart_items = WC()->cart->get_cart();
@@ -284,7 +280,7 @@ $zc_cart_subtotal_html = function_exists('wc_price')
             }
           }
 
-          if (!empty($cart_item['zc_custom_design']) && empty($cart_item['zc_design_request'])) {
+          if (!empty($cart_item['zc_custom_design'])) {
             $zc_variation_rows[] = 'Custom design: ' . (!empty($cart_item['zc_design_title']) ? $cart_item['zc_design_title'] : 'Untitled Design');
 
             if (!empty($cart_item['zc_imprint'])) {

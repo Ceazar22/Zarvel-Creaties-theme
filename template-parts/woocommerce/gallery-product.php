@@ -494,9 +494,6 @@ if (strpos($zc_modal_product_key, 'airpod') !== false) {
       <input type="hidden" name="zarvel_customize_form_submit" value="1">
       <input type="hidden" name="zc_product_form_submission" value="1">
       <input type="hidden" name="zc_product_id" value="<?php echo esc_attr($product->get_id()); ?>">
-      <input type="hidden" name="zc_return_url" value="<?php echo esc_url($product->get_permalink()); ?>">
-      <input type="hidden" name="zc_variation_id" data-zc-design-variation-id value="">
-      <input type="hidden" name="quantity" data-zc-design-quantity value="1">
       <input type="hidden" name="selected_options" data-zc-design-selected-options value="">
 
       <div class="zc-design-modal__selected">
@@ -887,8 +884,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const designModal = document.querySelector('[data-zc-design-modal]');
     const designModalSummary = document.querySelector('[data-zc-design-selected-summary]');
     const designModalOptionsInput = document.querySelector('[data-zc-design-selected-options]');
-    const designModalVariationInput = document.querySelector('[data-zc-design-variation-id]');
-    const designModalQuantityInput = document.querySelector('[data-zc-design-quantity]');
     const designModalCloseButtons = document.querySelectorAll('[data-zc-design-modal-close]');
     const placementSelect = document.querySelector('[data-zc-placement-select]');
     const placementCostNote = document.querySelector('[data-zc-placement-cost-note]');
@@ -1005,14 +1000,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (designModalOptionsInput) {
         designModalOptionsInput.value = selectedOptionsText;
-      }
-
-      if (designModalVariationInput) {
-        designModalVariationInput.value = variationId && variationId !== '0' ? variationId : '';
-      }
-
-      if (designModalQuantityInput) {
-        designModalQuantityInput.value = getQuantityFromForm(form);
       }
 
       if (designModalSummary) {
@@ -1338,14 +1325,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
 .zc-product-layout {
   display: grid;
-  grid-template-columns: 52% 48%;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
   gap: 54px;
   align-items: start;
 }
 
+.zc-product-layout > *,
+.zc-product-gallery,
+.zc-product-summary {
+  min-width: 0;
+}
+
 .zc-product-gallery {
   display: grid;
-  grid-template-columns: 88px 1fr;
+  grid-template-columns: 88px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
