@@ -124,7 +124,7 @@ get_header();
             <li>Product, checkout, and service pages</li>
           </ul>
 
-          <a href="<?php echo esc_url(home_url('/contact')); ?>">Build a Website</a>
+          <a href="<?php echo esc_url(add_query_arg('service', 'website', home_url('/contact/'))); ?>">Build a Website</a>
         </article>
       </div>
     </div>

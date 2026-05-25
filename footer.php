@@ -174,13 +174,18 @@
 .site-footer__logo {
   color: #ffffff;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  width: 212px;
+  height: 68px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .site-footer__logo-image {
   display: block;
-  width: 212px;
-  height: 68px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   object-position: center;
   filter: invert(1);

@@ -440,13 +440,9 @@ function zarvel_get_shop_categories($limit = 0) {
  * Shipping rule:
  * - United States: free shipping.
  * - Outside United States: keep Printful/WooCommerce live shipping rates.
- * - If no non-US rate is returned, add a fallback estimate so checkout never
- *   completes with accidental zero shipping.
+ * - If no non-US rate is returned, add a quantity-based fallback estimate so
+ *   checkout never completes with accidental zero shipping.
  */
-if (!defined('ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK')) {
-    define('ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK', 299);
-}
-
 function zarvel_is_us_shipping_destination($package) {
     $country = zarvel_get_package_destination_country($package);
 
@@ -500,6 +496,133 @@ function zarvel_get_cart_total_html() {
     $cart_total = (float) WC()->cart->get_total('edit');
 
     return function_exists('wc_price') ? wc_price($cart_total) : '$' . number_format($cart_total, 2);
+}
+
+function zarvel_package_has_paid_shipping_rate($rates) {
+    if (!is_array($rates)) {
+        return false;
+    }
+
+    foreach ($rates as $rate) {
+        if (is_object($rate) && method_exists($rate, 'get_cost') && (float) $rate->get_cost() > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function zarvel_cart_has_paid_shipping_rate() {
+    if (!function_exists('WC') || !WC()->shipping()) {
+        return false;
+    }
+
+    foreach (WC()->shipping()->get_packages() as $package) {
+        if (!empty($package['rates']) && zarvel_package_has_paid_shipping_rate($package['rates'])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function zarvel_get_package_item_count($package) {
+    if (empty($package['contents']) || !is_array($package['contents'])) {
+        return 1;
+    }
+
+    $count = 0;
+
+    foreach ($package['contents'] as $cart_item) {
+        $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+
+        if (
+            is_object($product) &&
+            method_exists($product, 'needs_shipping') &&
+            !$product->needs_shipping()
+        ) {
+            continue;
+        }
+
+        $count += !empty($cart_item['quantity']) ? max(1, (int) $cart_item['quantity']) : 1;
+    }
+
+    return max(1, $count);
+}
+
+function zarvel_get_international_shipping_fallback($country, $package) {
+    $country = strtoupper((string) $country);
+    $item_count = zarvel_get_package_item_count($package);
+    $additional_count = max(0, $item_count - 1);
+    $rates = zarvel_get_printful_region_shipping_rates($country);
+
+    return (float) $rates['base'] + ($additional_count * (float) $rates['additional']);
+}
+
+function zarvel_get_printful_region_shipping_rates($country) {
+    $country = strtoupper((string) $country);
+
+    $regions = array(
+        'canada' => array(
+            'countries'  => array('CA'),
+            'base'       => 8.29,
+            'additional' => 1.95,
+        ),
+        'uk' => array(
+            'countries'  => array('GB'),
+            'base'       => 4.59,
+            'additional' => 1.50,
+        ),
+        'efta' => array(
+            'countries'  => array('CH', 'IS', 'LI', 'NO'),
+            'base'       => 7.99,
+            'additional' => 1.95,
+        ),
+        'europe' => array(
+            'countries'  => array(
+                'AD', 'AL', 'AT', 'BA', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE',
+                'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV',
+                'MC', 'MD', 'ME', 'MK', 'MT', 'NL', 'PL', 'PT', 'RO', 'RS', 'SE',
+                'SI', 'SK', 'SM', 'TR', 'UA', 'VA',
+            ),
+            'base'       => 4.79,
+            'additional' => 1.45,
+        ),
+        'australia_new_zealand' => array(
+            'countries'  => array('AU', 'NZ'),
+            'base'       => 7.19,
+            'additional' => 1.30,
+        ),
+        'japan' => array(
+            'countries'  => array('JP'),
+            'base'       => 4.39,
+            'additional' => 1.50,
+        ),
+        'brazil' => array(
+            'countries'  => array('BR'),
+            'base'       => 4.49,
+            'additional' => 2.50,
+        ),
+        'worldwide' => array(
+            'countries'  => array(),
+            'base'       => 11.99,
+            'additional' => 6.00,
+        ),
+    );
+
+    foreach ($regions as $region) {
+        if (in_array($country, $region['countries'], true)) {
+            return array(
+                'base'       => $region['base'],
+                'additional' => $region['additional'],
+            );
+        }
+    }
+
+    return array(
+        'base'       => $regions['worldwide']['base'],
+        'additional' => $regions['worldwide']['additional'],
+    );
 }
 
 function zarvel_refresh_cart_totals() {
@@ -651,21 +774,12 @@ add_filter('woocommerce_package_rates', function ($rates, $package) {
         return $rates;
     }
 
-    $has_paid_shipping_rate = false;
-
-    foreach ($rates as $rate) {
-        if (is_object($rate) && method_exists($rate, 'get_cost') && (float) $rate->get_cost() > 0) {
-            $has_paid_shipping_rate = true;
-            break;
-        }
-    }
-
-    if (!$has_paid_shipping_rate) {
+    if (!zarvel_package_has_paid_shipping_rate($rates)) {
         $fallback_rate_id = 'zarvel_international_printful_estimate';
         $rates[$fallback_rate_id] = new WC_Shipping_Rate(
             $fallback_rate_id,
-            __('International Shipping (Printful estimate)', 'zarvel-creative'),
-            (float) ZARVEL_INTERNATIONAL_SHIPPING_FALLBACK,
+            __('Standard International Shipping', 'zarvel-creative'),
+            zarvel_get_international_shipping_fallback($destination_country, $package),
             array(),
             'zarvel_international_printful_estimate'
         );
@@ -691,7 +805,19 @@ add_action('woocommerce_checkout_process', function () {
 
     $country = strtoupper((string) $country);
 
-    if ($country && $country !== 'US' && (float) WC()->cart->get_shipping_total() <= 0) {
+    if ($country && WC()->customer) {
+        WC()->customer->set_shipping_country($country);
+    }
+
+    WC()->cart->calculate_shipping();
+    WC()->cart->calculate_totals();
+
+    if (
+        $country &&
+        $country !== 'US' &&
+        (float) WC()->cart->get_shipping_total() <= 0 &&
+        !zarvel_cart_has_paid_shipping_rate()
+    ) {
         wc_add_notice(
             __('International shipping must be calculated before placing your order. Please review your address and shipping method.', 'zarvel-creative'),
             'error'

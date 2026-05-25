@@ -657,3 +657,129 @@ function zarvel_handle_customize_form() {
     exit;
 }
 add_action('template_redirect', 'zarvel_handle_customize_form');
+
+/**
+ * Handle Website Project Form
+ */
+function zarvel_handle_website_request_form() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        return;
+    }
+
+    if (empty($_POST['zarvel_website_form_submit'])) {
+        return;
+    }
+
+    $redirect_url = add_query_arg('service', 'website', home_url('/contact/'));
+
+    if (
+        empty($_POST['zarvel_website_nonce']) ||
+        !wp_verify_nonce(
+            sanitize_text_field(wp_unslash($_POST['zarvel_website_nonce'])),
+            'zarvel_website_form_action'
+        )
+    ) {
+        wp_safe_redirect(add_query_arg('request_status', 'security_error', $redirect_url));
+        exit;
+    }
+
+    if (!empty($_POST['website_url'])) {
+        wp_safe_redirect(add_query_arg('request_status', 'spam', $redirect_url));
+        exit;
+    }
+
+    $user_ip = isset($_SERVER['REMOTE_ADDR'])
+        ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']))
+        : 'unknown';
+
+    $is_local_site =
+        (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local') ||
+        strpos((string) home_url('/'), '.local') !== false ||
+        strpos((string) home_url('/'), 'localhost') !== false;
+
+    if (!$is_local_site) {
+        $rate_limit_key = 'zarvel_website_form_' . md5($user_ip);
+
+        if (get_transient($rate_limit_key)) {
+            wp_safe_redirect(add_query_arg('request_status', 'too_many_requests', $redirect_url));
+            exit;
+        }
+
+        set_transient($rate_limit_key, true, 60);
+    }
+
+    $full_name = isset($_POST['full_name']) ? sanitize_text_field(wp_unslash($_POST['full_name'])) : '';
+    $email = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+    $phone = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+    $business_name = isset($_POST['business_name']) ? sanitize_text_field(wp_unslash($_POST['business_name'])) : '';
+    $current_website = isset($_POST['current_website']) ? esc_url_raw(wp_unslash($_POST['current_website'])) : '';
+    $website_type = isset($_POST['website_type']) ? sanitize_text_field(wp_unslash($_POST['website_type'])) : '';
+    $platform = isset($_POST['platform']) ? sanitize_text_field(wp_unslash($_POST['platform'])) : '';
+    $budget = isset($_POST['budget']) ? sanitize_text_field(wp_unslash($_POST['budget'])) : '';
+    $timeline = isset($_POST['timeline']) ? sanitize_text_field(wp_unslash($_POST['timeline'])) : '';
+    $features = isset($_POST['features']) ? array_map('sanitize_text_field', wp_unslash((array) $_POST['features'])) : array();
+    $project_notes = isset($_POST['project_notes']) ? sanitize_textarea_field(wp_unslash($_POST['project_notes'])) : '';
+
+    if (empty($full_name) || empty($email) || empty($website_type) || empty($project_notes)) {
+        wp_safe_redirect(add_query_arg('request_status', 'missing_fields', $redirect_url));
+        exit;
+    }
+
+    if (!is_email($email)) {
+        wp_safe_redirect(add_query_arg('request_status', 'invalid_email', $redirect_url));
+        exit;
+    }
+
+    $recipient = 'bryanceazartabanas@gmail.com';
+    $subject = 'New Website Project Request - ' . $full_name;
+
+    $message = "New website project request\n";
+    $message .= "===========================\n\n";
+    $message .= "Customer Details\n";
+    $message .= "----------------\n";
+    $message .= "Full Name: {$full_name}\n";
+    $message .= "Email: {$email}\n";
+    $message .= "Phone: {$phone}\n";
+    $message .= "Business / Brand: {$business_name}\n";
+    $message .= "Current Website: {$current_website}\n\n";
+    $message .= "Website Project\n";
+    $message .= "---------------\n";
+    $message .= "Website Type: {$website_type}\n";
+    $message .= "Preferred Platform: {$platform}\n";
+    $message .= "Budget: {$budget}\n";
+    $message .= "Timeline: {$timeline}\n";
+    $message .= "Features: " . (!empty($features) ? implode(', ', $features) : 'Not specified') . "\n\n";
+    $message .= "Project Notes\n";
+    $message .= "-------------\n";
+    $message .= "{$project_notes}\n\n";
+    $message .= "Sent from: " . $redirect_url . "\n";
+
+    $safe_reply_name = str_replace(array("\r", "\n"), '', $full_name);
+    $safe_reply_mail = str_replace(array("\r", "\n"), '', $email);
+
+    $site_host = (string) wp_parse_url(home_url('/'), PHP_URL_HOST);
+    $site_host = preg_replace('/^www\./', '', $site_host);
+    $from_email = $site_host ? 'wordpress@' . $site_host : get_option('admin_email');
+
+    if (defined('ZARVEL_SMTP_FROM') && is_email(ZARVEL_SMTP_FROM)) {
+        $from_email = ZARVEL_SMTP_FROM;
+    }
+
+    $headers = array(
+        'Content-Type: text/plain; charset=UTF-8',
+        'From: Zarvel Creatives <' . $from_email . '>',
+        'Reply-To: ' . $safe_reply_name . ' <' . $safe_reply_mail . '>',
+    );
+
+    $saved_locally = zarvel_save_customize_form_submission($subject, $message);
+    $sent = wp_mail($recipient, $subject, $message, $headers);
+
+    if ($sent || $saved_locally) {
+        wp_safe_redirect(add_query_arg('request_status', 'success', $redirect_url));
+        exit;
+    }
+
+    wp_safe_redirect(add_query_arg('request_status', 'failed', $redirect_url));
+    exit;
+}
+add_action('template_redirect', 'zarvel_handle_website_request_form');
